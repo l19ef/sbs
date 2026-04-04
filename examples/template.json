@@ -1,0 +1,54 @@
+{
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "dns": {
+    "servers": [
+      {
+        "type": "tls",
+        "tag": "cloudflare",
+        "server": "1.1.1.1"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "type": "tun",
+      "address": "172.16.0.1/30",
+      "auto_route": true,
+      "strict_route": true
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "🎯 direct",
+      "type": "direct"
+    },
+    {
+      "tag": "🔀 proxy",
+      "type": "selector",
+      "subscriptions": ["main-proxy"],
+      "default": "⚡️ fastest",
+      "interrupt_exist_connections": true
+    },
+    {
+      "tag": "⚡️ fastest",
+      "type": "urltest",
+      "subscriptions": ["main-proxy"],
+      "url": "http://cp.cloudflare.com/generate_204",
+      "interval": "5m0s",
+      "tolerance": 50
+    }
+  ],
+  "subscriptions": [
+    {
+      "tag": "main-proxy",
+      "url": "https://example.com/subscription.json"
+    }
+  ],
+  "route": {
+    "final": "🔀 proxy",
+    "auto_detect_interface": true
+  }
+}
