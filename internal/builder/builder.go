@@ -42,10 +42,9 @@ func BuildWithOptions(templateData []byte, baseDir string, loader SubscriptionCo
 	}
 
 	resolver := &subscriptionResolver{
-		byTag:   subscriptionByTag,
-		cache:   map[string][]map[string]any{},
-		loader:  loader,
-		options: options,
+		byTag:  subscriptionByTag,
+		cache:  map[string][]map[string]any{},
+		loader: loader,
 	}
 
 	if err := expandSubscriptions(raw, resolver); err != nil {
@@ -116,10 +115,37 @@ func extractRootSubscriptions(root map[string]any) (map[string]subscriptionSourc
 		}
 
 		subscriptionByTag[tag] = subscriptionSource{
-			Tag: tag,
-			URL: url,
+			Tag:              tag,
+			URL:              url,
+			Emojify:          toBool(item["emojify"]),
+			Exclude:          toStringArray(item["exclude"]),
+			ExcludeProtocols: toStringArray(item["exclude_protocols"]),
 		}
 	}
 
 	return subscriptionByTag, nil
+}
+
+func toBool(v any) bool {
+	if b, ok := v.(bool); ok {
+		return b
+	}
+	return false
+}
+
+func toStringArray(v any) []string {
+	if v == nil {
+		return nil
+	}
+	list, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	result := make([]string, 0, len(list))
+	for _, item := range list {
+		if s, ok := item.(string); ok {
+			result = append(result, s)
+		}
+	}
+	return result
 }

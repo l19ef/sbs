@@ -44,7 +44,10 @@
   "subscriptions": [
     {
       "tag": "main-proxy",
-      "url": "https://example.com/subscription.json"
+      "url": "https://example.com/subscription.json",
+      "emojify": true,
+      "exclude": ["ads"],
+      "exclude_protocols": ["hysteria2"]
     }
   ],
   "route": {

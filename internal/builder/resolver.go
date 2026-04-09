@@ -6,10 +6,9 @@ import (
 )
 
 type subscriptionResolver struct {
-	byTag   map[string]subscriptionSource
-	cache   map[string][]map[string]any
-	loader  SubscriptionContentLoader
-	options BuildOptions
+	byTag  map[string]subscriptionSource
+	cache  map[string][]map[string]any
+	loader SubscriptionContentLoader
 }
 
 func (r *subscriptionResolver) resolve(tag string) ([]map[string]any, error) {
@@ -31,7 +30,13 @@ func (r *subscriptionResolver) resolve(tag string) ([]map[string]any, error) {
 		return nil, fmt.Errorf("load subscription %q: %w", tag, err)
 	}
 
-	items, err := parseSubscriptionContent(data, tag, r.options)
+	options := BuildOptions{
+		Emojify:          source.Emojify,
+		ExcludePatterns:  source.Exclude,
+		ExcludeProtocols: source.ExcludeProtocols,
+	}
+
+	items, err := parseSubscriptionContent(data, tag, options)
 	if err != nil {
 		return nil, fmt.Errorf("parse subscription %q: %w", tag, err)
 	}
