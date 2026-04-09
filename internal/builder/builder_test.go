@@ -327,6 +327,36 @@ func TestParseSubscriptionContentExcludesByPatternAndProtocol(t *testing.T) {
 	}
 }
 
+func TestParseSubscriptionContentUniquifiesDuplicateTags(t *testing.T) {
+	outbounds, err := parseSubscriptionContent([]byte(stringsJoinLines(
+		"vless://uuid@1.1.1.1:443?sni=example.com&security=reality&pbk=key1&sid=abc#%F0%9F%9A%80%20Marz%20%28max%29%20%5BVLESS%20-%20tcp%5D",
+		"vless://uuid@1.1.1.1:444?sni=example2.com&security=reality&pbk=key2&sid=def#%F0%9F%9A%80%20Marz%20%28max%29%20%5BVLESS%20-%20tcp%5D",
+		"trojan://pass@2.2.2.2:443#Node%20A",
+		"trojan://pass@2.2.2.2:444#Node%20A",
+		"trojan://pass@2.2.2.2:445#Node%20A",
+	)), "remote", BuildOptions{})
+	if err != nil {
+		t.Fatalf("parse subscription content: %v", err)
+	}
+
+	if len(outbounds) != 5 {
+		t.Fatalf("unexpected outbound count: got %d want 5", len(outbounds))
+	}
+
+	expectedTags := []string{
+		"🚀 Marz (max) [VLESS - tcp]",
+		"🚀 Marz (max) [VLESS - tcp] (2)",
+		"Node A",
+		"Node A (2)",
+		"Node A (3)",
+	}
+	for i, outbound := range outbounds {
+		if got := outbound["tag"]; got != expectedTags[i] {
+			t.Fatalf("outbound[%d] tag: got %q want %q", i, got, expectedTags[i])
+		}
+	}
+}
+
 func stringsJoinLines(lines ...string) string {
 	return fmt.Sprintf("%s\n", strings.Join(lines, "\n"))
 }

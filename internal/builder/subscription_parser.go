@@ -54,6 +54,7 @@ func parseSubscriptionContent(data []byte, tagPrefix string, options BuildOption
 
 func postProcessOutbounds(outbounds []map[string]any, options BuildOptions) []map[string]any {
 	filtered := filterOutbounds(outbounds, options)
+	filtered = ensureTagUniqueness(filtered)
 	if !options.Emojify {
 		return filtered
 	}
@@ -98,6 +99,38 @@ func filterOutbounds(outbounds []map[string]any, options BuildOptions) []map[str
 		filtered = append(filtered, outbound)
 	}
 	return filtered
+}
+
+func ensureTagUniqueness(outbounds []map[string]any) []map[string]any {
+	seen := make(map[string]int, len(outbounds))
+	for _, outbound := range outbounds {
+		tag := anyToString(outbound["tag"])
+		seen[tag]++
+	}
+
+	renamed := make(map[string]int, len(outbounds))
+	for i, outbound := range outbounds {
+		tag := anyToString(outbound["tag"])
+		if seen[tag] > 1 {
+			if renamed[tag] == 0 {
+				renamed[tag] = 1
+				continue
+			}
+			for n := renamed[tag] + 1; ; n++ {
+				newTag := fmt.Sprintf("%s (%d)", tag, n)
+				if seen[newTag] == 0 {
+					outbound["tag"] = newTag
+					seen[newTag] = 1
+					renamed[tag] = n
+					break
+				}
+			}
+			outbounds[i] = outbound
+		} else {
+			renamed[tag] = 0
+		}
+	}
+	return outbounds
 }
 
 func matchesAnyExcludePattern(tag string, patterns []string) bool {
