@@ -14,8 +14,15 @@ import (
 
 var countryPrefixPattern = regexp.MustCompile(`^([A-Z]{2})(?:$|[^A-Za-z])`)
 
+func decodeBase64IfNeeded(data []byte) []byte {
+	if decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(data))); err == nil {
+		return decoded
+	}
+	return data
+}
+
 func parseSubscriptionContent(data []byte, tagPrefix string, options BuildOptions) ([]map[string]any, error) {
-	text := normalizeSubscriptionText(string(data))
+	text := normalizeSubscriptionText(string(decodeBase64IfNeeded(data)))
 	if text == "" {
 		return nil, fmt.Errorf("subscription is empty")
 	}

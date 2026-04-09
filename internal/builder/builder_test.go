@@ -2,6 +2,7 @@ package builder
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -283,6 +284,25 @@ func TestParseSubscriptionContentEmojifiesRecognizedCountryPrefix(t *testing.T) 
 	}
 	if got := outbounds[2]["tag"]; got != "🇬🇧 UK / Trojan" {
 		t.Fatalf("unexpected emojified UK tag: %#v", got)
+	}
+}
+
+func TestParseSubscriptionContentDecodesBase64Payload(t *testing.T) {
+	content := base64.StdEncoding.EncodeToString([]byte(
+		"vmess://eyJhZGQiOiJ2bWVzcy5leGFtcGxlLmNvbSIsImFpZCI6IjAiLCJob3N0IjoiY2RuLmV4YW1wbGUuY29tIiwiaWQiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTExIiwibmV0Ijoid3MiLCJwYXRoIjoiL3dzIiwicG9ydCI6IjQ0MyIsInBzIjoibm9kZS1hIiwic2N5IjoiYXV0byIsInNuaSI6InZtZXNzLmV4YW1wbGUuY29tIiwidGxzIjoidGxzIn0=\n" +
+			"trojan://secret@example.com:443#node-b\n",
+	))
+
+	outbounds, err := parseSubscriptionContent([]byte(content), "remote", BuildOptions{})
+	if err != nil {
+		t.Fatalf("parse subscription content: %v", err)
+	}
+
+	if len(outbounds) != 2 {
+		t.Fatalf("unexpected outbound count: got %d want 2", len(outbounds))
+	}
+	if outbounds[0]["type"] != "vmess" || outbounds[1]["type"] != "trojan" {
+		t.Fatalf("unexpected outbound types: %#v", outbounds)
 	}
 }
 

@@ -122,7 +122,7 @@ func runServer(cfg *HostConfig) error {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(result)
 	})
 
