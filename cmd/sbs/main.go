@@ -2,15 +2,21 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
+	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -121,6 +127,9 @@ func runServer(cfg *HostConfig) error {
 		tokenMap[cfg.Templates[i].Token] = &cfg.Templates[i]
 	}
 
+	lastGoodByToken := make(map[string][]byte, len(tokenMap))
+	var cacheMu sync.RWMutex
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) {
 		token := r.URL.Query().Get("token")
@@ -133,8 +142,19 @@ func runServer(cfg *HostConfig) error {
 		result, err := builder.BuildFromFile(tmpl.Path)
 		if err != nil {
 			log.Printf("generation failed: %v", err)
-			http.Error(w, "Generation failed", http.StatusInternalServerError)
-			return
+			cacheMu.RLock()
+			cached, ok := lastGoodByToken[token]
+			cacheMu.RUnlock()
+			if !ok {
+				http.Error(w, "Generation failed", http.StatusInternalServerError)
+				return
+			}
+			log.Printf("serving last good config for token=%s", token)
+			result = append([]byte(nil), cached...)
+		} else {
+			cacheMu.Lock()
+			lastGoodByToken[token] = append([]byte(nil), result...)
+			cacheMu.Unlock()
 		}
 
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -171,7 +191,36 @@ func runServer(cfg *HostConfig) error {
 		fmt.Printf("  https://%s/config?token=%s\n", displayPort, tmpl.Token)
 	}
 
-	return http.ServeTLS(ln, mux, cfg.TLSCert, cfg.TLSKey)
+	server := &http.Server{Handler: mux}
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- server.ServeTLS(ln, cfg.TLSCert, cfg.TLSKey)
+	}()
+
+	shutdownCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	select {
+	case err := <-errCh:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+		return nil
+	case <-shutdownCtx.Done():
+		log.Println("shutdown signal received, stopping server")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		return fmt.Errorf("shutdown server: %w", err)
+	}
+
+	serveErr := <-errCh
+	if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+		return serveErr
+	}
+	return nil
 }
 
 func generate(templatePath, outputPath string, stdout io.Writer) error {

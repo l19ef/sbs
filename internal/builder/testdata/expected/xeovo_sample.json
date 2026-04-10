@@ -1,0 +1,323 @@
+[
+  {
+    "down_mbps": 100,
+    "password": "ffe8ae49-05d7-4f56-a82b-dd618108c270",
+    "server": "192.166.82.244",
+    "server_port": 443,
+    "tag": "US-SLC / Hysteria2",
+    "tls": {
+      "alpn": [
+        "h3"
+      ],
+      "enabled": true,
+      "insecure": false,
+      "server_name": "us-slc-hysteria1.xeovo.net"
+    },
+    "type": "hysteria2",
+    "up_mbps": 10
+  },
+  {
+    "method": "chacha20-ietf-poly1305",
+    "password": "pn6E56A7qktsmFhNR1Tl2sbahAhK",
+    "server": "us-slc-global1.xeovo.eu",
+    "server_port": 9000,
+    "tag": "US-SLC / Shadowsocks",
+    "type": "shadowsocks"
+  },
+  {
+    "method": "chacha20-ietf-poly1305",
+    "password": "pn6E56A7qktsmFhNR1Tl2sbahAhK",
+    "plugin": "v2ray-plugin",
+    "plugin_opts": "tls;host=us-slc-global1.xeovo.net;path=/;mux=0;",
+    "server": "us-slc-global1.xeovo.eu",
+    "server_port": 9002,
+    "tag": "US-SLC / Shadowsocks (v2ray)",
+    "type": "shadowsocks"
+  },
+  {
+    "password": "mFhNR1Tl2sbahAhK",
+    "server": "us-slc-global1.xeovo.eu",
+    "server_port": 444,
+    "tag": "US-SLC / Trojan (TLS)",
+    "tls": {
+      "enabled": true,
+      "insecure": false
+    },
+    "type": "trojan"
+  },
+  {
+    "password": "mFhNR1Tl2sbahAhK",
+    "server": "us-slc-global1.xeovo.eu",
+    "server_port": 443,
+    "tag": "US-SLC / Trojan (WS TLS)",
+    "tls": {
+      "enabled": true,
+      "insecure": false,
+      "server_name": "us-slc-global1.xeovo.eu"
+    },
+    "transport": {
+      "headers": {
+        "Host": "us-slc-global1.xeovo.eu"
+      },
+      "path": "/colcha",
+      "type": "ws"
+    },
+    "type": "trojan"
+  },
+  {
+    "packet_encoding": "xudp",
+    "server": "us-slc-global1.xeovo.eu",
+    "server_port": 443,
+    "tag": "US-SLC / VLESS (WS TLS)",
+    "tls": {
+      "enabled": true,
+      "insecure": false,
+      "server_name": "us-slc-global1.xeovo.eu"
+    },
+    "transport": {
+      "headers": {
+        "Host": "us-slc-global1.xeovo.eu"
+      },
+      "path": "/potosi",
+      "type": "ws"
+    },
+    "type": "vless",
+    "uuid": "ffe8ae49-05d7-4f56-a82b-dd618108c270"
+  },
+  {
+    "alter_id": 0,
+    "packet_encoding": "xudp",
+    "security": "none",
+    "server": "us-slc-global1.xeovo.eu",
+    "server_port": 443,
+    "tag": "US-SLC / VMess (WS+TLS)",
+    "tls": {
+      "enabled": true,
+      "insecure": true,
+      "server_name": "us-slc-global1.xeovo.eu"
+    },
+    "transport": {
+      "headers": {
+        "Host": "us-slc-global1.xeovo.eu"
+      },
+      "path": "/sacaca",
+      "type": "ws"
+    },
+    "type": "vmess",
+    "uuid": "ffe8ae49-05d7-4f56-a82b-dd618108c270"
+  },
+  {
+    "down_mbps": 100,
+    "password": "ffe8ae49-05d7-4f56-a82b-dd618108c270",
+    "server": "38.135.25.189",
+    "server_port": 443,
+    "tag": "US-NYC / Hysteria2",
+    "tls": {
+      "alpn": [
+        "h3"
+      ],
+      "enabled": true,
+      "insecure": false,
+      "server_name": "us-nyc-hysteria2.xeovo.net"
+    },
+    "type": "hysteria2",
+    "up_mbps": 10
+  },
+  {
+    "down_mbps": 100,
+    "password": "ffe8ae49-05d7-4f56-a82b-dd618108c270",
+    "server": "107.172.155.43",
+    "server_port": 443,
+    "tag": "US-NYC / Hysteria2 (2)",
+    "tls": {
+      "alpn": [
+        "h3"
+      ],
+      "enabled": true,
+      "insecure": false,
+      "server_name": "us-nyc-hysteria1.xeovo.net"
+    },
+    "type": "hysteria2",
+    "up_mbps": 10
+  },
+  {
+    "method": "chacha20-ietf-poly1305",
+    "password": "pn6E56A7qktsmFhNR1Tl2sbahAhK",
+    "server": "us-nyc-global2.xeovo.net",
+    "server_port": 9000,
+    "tag": "US-NYC / Shadowsocks",
+    "type": "shadowsocks"
+  },
+  {
+    "method": "chacha20-ietf-poly1305",
+    "password": "pn6E56A7qktsmFhNR1Tl2sbahAhK",
+    "plugin": "v2ray-plugin",
+    "plugin_opts": "tls;host=us-nyc-global2.xeovo.net;path=/;mux=0;",
+    "server": "us-nyc-global2.xeovo.net",
+    "server_port": 9002,
+    "tag": "US-NYC / Shadowsocks (v2ray)",
+    "type": "shadowsocks"
+  },
+  {
+    "password": "mFhNR1Tl2sbahAhK",
+    "server": "us-nyc-global2.xeovo.net",
+    "server_port": 444,
+    "tag": "US-NYC / Trojan (TLS)",
+    "tls": {
+      "enabled": true,
+      "insecure": false
+    },
+    "type": "trojan"
+  },
+  {
+    "password": "mFhNR1Tl2sbahAhK",
+    "server": "us-nyc-global2.xeovo.net",
+    "server_port": 443,
+    "tag": "US-NYC / Trojan (WS TLS)",
+    "tls": {
+      "enabled": true,
+      "insecure": false,
+      "server_name": "us-nyc-global2.xeovo.net"
+    },
+    "transport": {
+      "headers": {
+        "Host": "us-nyc-global2.xeovo.net"
+      },
+      "path": "/colcha",
+      "type": "ws"
+    },
+    "type": "trojan"
+  },
+  {
+    "packet_encoding": "xudp",
+    "server": "us-nyc-global2.xeovo.net",
+    "server_port": 443,
+    "tag": "US-NYC / VLESS (WS TLS)",
+    "tls": {
+      "enabled": true,
+      "insecure": false,
+      "server_name": "us-nyc-global2.xeovo.net"
+    },
+    "transport": {
+      "headers": {
+        "Host": "us-nyc-global2.xeovo.net"
+      },
+      "path": "/potosi",
+      "type": "ws"
+    },
+    "type": "vless",
+    "uuid": "ffe8ae49-05d7-4f56-a82b-dd618108c270"
+  },
+  {
+    "alter_id": 0,
+    "packet_encoding": "xudp",
+    "security": "none",
+    "server": "us-nyc-global2.xeovo.net",
+    "server_port": 443,
+    "tag": "US-NYC / VMess (WS+TLS)",
+    "tls": {
+      "enabled": true,
+      "insecure": true,
+      "server_name": "us-nyc-global2.xeovo.net"
+    },
+    "transport": {
+      "headers": {
+        "Host": "us-nyc-global2.xeovo.net"
+      },
+      "path": "/sacaca",
+      "type": "ws"
+    },
+    "type": "vmess",
+    "uuid": "ffe8ae49-05d7-4f56-a82b-dd618108c270"
+  },
+  {
+    "method": "chacha20-ietf-poly1305",
+    "password": "pn6E56A7qktsmFhNR1Tl2sbahAhK",
+    "server": "us-lv-global1.xeovo.net",
+    "server_port": 9000,
+    "tag": "US-LV / Shadowsocks",
+    "type": "shadowsocks"
+  },
+  {
+    "method": "chacha20-ietf-poly1305",
+    "password": "pn6E56A7qktsmFhNR1Tl2sbahAhK",
+    "plugin": "v2ray-plugin",
+    "plugin_opts": "tls;host=us-lv-global1.xeovo.net;path=/;mux=0;",
+    "server": "us-lv-global1.xeovo.net",
+    "server_port": 9002,
+    "tag": "US-LV / Shadowsocks (v2ray)",
+    "type": "shadowsocks"
+  },
+  {
+    "password": "mFhNR1Tl2sbahAhK",
+    "server": "us-lv-global1.xeovo.net",
+    "server_port": 444,
+    "tag": "US-LV / Trojan (TLS)",
+    "tls": {
+      "enabled": true,
+      "insecure": false
+    },
+    "type": "trojan"
+  },
+  {
+    "password": "mFhNR1Tl2sbahAhK",
+    "server": "us-lv-global1.xeovo.net",
+    "server_port": 443,
+    "tag": "US-LV / Trojan (WS TLS)",
+    "tls": {
+      "enabled": true,
+      "insecure": false,
+      "server_name": "us-lv-global1.xeovo.net"
+    },
+    "transport": {
+      "headers": {
+        "Host": "us-lv-global1.xeovo.net"
+      },
+      "path": "/colcha",
+      "type": "ws"
+    },
+    "type": "trojan"
+  },
+  {
+    "packet_encoding": "xudp",
+    "server": "us-lv-global1.xeovo.net",
+    "server_port": 443,
+    "tag": "US-LV / VLESS (WS TLS)",
+    "tls": {
+      "enabled": true,
+      "insecure": false,
+      "server_name": "us-lv-global1.xeovo.net"
+    },
+    "transport": {
+      "headers": {
+        "Host": "us-lv-global1.xeovo.net"
+      },
+      "path": "/potosi",
+      "type": "ws"
+    },
+    "type": "vless",
+    "uuid": "ffe8ae49-05d7-4f56-a82b-dd618108c270"
+  },
+  {
+    "alter_id": 0,
+    "packet_encoding": "xudp",
+    "security": "none",
+    "server": "us-lv-global1.xeovo.net",
+    "server_port": 443,
+    "tag": "US-LV / VMess (WS+TLS)",
+    "tls": {
+      "enabled": true,
+      "insecure": true,
+      "server_name": "us-lv-global1.xeovo.net"
+    },
+    "transport": {
+      "headers": {
+        "Host": "us-lv-global1.xeovo.net"
+      },
+      "path": "/sacaca",
+      "type": "ws"
+    },
+    "type": "vmess",
+    "uuid": "ffe8ae49-05d7-4f56-a82b-dd618108c270"
+  }
+]

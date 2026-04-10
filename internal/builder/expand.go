@@ -33,7 +33,7 @@ func expandSubscriptions(node any, resolver *subscriptionResolver) error {
 				return err
 			}
 
-			for _, tag := range collectTags(items) {
+			for _, tag := range collectOutboundTags(items) {
 				if !slices.Contains(existing, tag) {
 					existing = append(existing, tag)
 				}

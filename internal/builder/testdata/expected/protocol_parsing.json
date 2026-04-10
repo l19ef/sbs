@@ -1,0 +1,101 @@
+[
+  {
+    "method": "chacha20-ietf-poly1305",
+    "password": "pass",
+    "plugin": "obfs-local",
+    "plugin_opts": "obfs=http;obfs-host=cdn.example.com;",
+    "server": "server.example.com",
+    "server_port": 9000,
+    "tag": "Node SS",
+    "type": "shadowsocks"
+  },
+  {
+    "password": "secret",
+    "server": "example.com",
+    "server_port": 443,
+    "tag": "Node Trojan",
+    "tls": {
+      "enabled": true,
+      "insecure": false,
+      "server_name": "example.com"
+    },
+    "transport": {
+      "headers": {
+        "Host": "cdn.example.com"
+      },
+      "path": "/ws",
+      "type": "ws"
+    },
+    "type": "trojan"
+  },
+  {
+    "packet_encoding": "xudp",
+    "server": "example.com",
+    "server_port": 443,
+    "tag": "Node VLESS",
+    "tls": {
+      "enabled": true,
+      "insecure": false,
+      "reality": {
+        "enabled": true,
+        "public_key": "pubkey123",
+        "short_id": "abcd"
+      },
+      "utls": {
+        "enabled": true,
+        "fingerprint": "chrome"
+      }
+    },
+    "transport": {
+      "service_name": "grpc-vless",
+      "type": "grpc"
+    },
+    "type": "vless",
+    "uuid": "11111111-1111-1111-1111-111111111111"
+  },
+  {
+    "alter_id": 0,
+    "packet_encoding": "xudp",
+    "security": "auto",
+    "server": "vmess.example.com",
+    "server_port": 443,
+    "tag": "Node VMess",
+    "tls": {
+      "enabled": true,
+      "insecure": true,
+      "server_name": "vmess.example.com"
+    },
+    "transport": {
+      "early_data_header_name": "Sec-WebSocket-Protocol",
+      "headers": {
+        "Host": "cdn.example.com"
+      },
+      "max_early_data": 1024,
+      "path": "/wc",
+      "type": "ws"
+    },
+    "type": "vmess",
+    "uuid": "22222222-2222-2222-2222-222222222222"
+  },
+  {
+    "down_mbps": 100,
+    "obfs": {
+      "password": "obfspass",
+      "type": "salamander"
+    },
+    "password": "password",
+    "server": "example.com",
+    "server_port": 443,
+    "tag": "Node HY2",
+    "tls": {
+      "alpn": [
+        "h3"
+      ],
+      "enabled": true,
+      "insecure": false,
+      "server_name": "example.com"
+    },
+    "type": "hysteria2",
+    "up_mbps": 10
+  }
+]

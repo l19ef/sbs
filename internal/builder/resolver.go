@@ -7,13 +7,13 @@ import (
 
 type subscriptionResolver struct {
 	byTag  map[string]subscriptionSource
-	cache  map[string][]map[string]any
+	cache  map[string][]Outbound
 	loader SubscriptionContentLoader
 }
 
-func (r *subscriptionResolver) resolve(tag string) ([]map[string]any, error) {
+func (r *subscriptionResolver) resolve(tag string) ([]Outbound, error) {
 	if items, ok := r.cache[tag]; ok {
-		return cloneOutboundList(items), nil
+		return cloneTypedOutboundList(items), nil
 	}
 
 	source, ok := r.byTag[tag]
@@ -43,11 +43,11 @@ func (r *subscriptionResolver) resolve(tag string) ([]map[string]any, error) {
 	}
 
 	for _, outbound := range items {
-		if _, ok := outbound["tag"].(string); !ok {
+		if outbound.Tag == "" {
 			return nil, fmt.Errorf("subscription %q contains outbound without string tag", tag)
 		}
 	}
 
-	r.cache[tag] = cloneOutboundList(items)
-	return cloneOutboundList(items), nil
+	r.cache[tag] = cloneTypedOutboundList(items)
+	return cloneTypedOutboundList(items), nil
 }

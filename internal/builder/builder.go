@@ -43,7 +43,7 @@ func BuildWithOptions(templateData []byte, baseDir string, loader SubscriptionCo
 
 	resolver := &subscriptionResolver{
 		byTag:  subscriptionByTag,
-		cache:  map[string][]map[string]any{},
+		cache:  map[string][]Outbound{},
 		loader: loader,
 	}
 
@@ -59,20 +59,29 @@ func BuildWithOptions(templateData []byte, baseDir string, loader SubscriptionCo
 		}
 	}
 
+	resolvedOutbounds := make([]Outbound, 0)
 	for _, items := range resolver.cache {
 		for _, outbound := range items {
-			tag, _ := outbound["tag"].(string)
+			tag := outbound.Tag
 			if tag == "" {
 				return nil, fmt.Errorf("resolved outbound without tag")
 			}
 			if _, exists := seenTopLevelTags[tag]; exists {
 				continue
 			}
-			rootOutbounds = append(rootOutbounds, outbound)
+			resolvedOutbounds = append(resolvedOutbounds, outbound)
 			seenTopLevelTags[tag] = struct{}{}
 		}
 	}
-	raw["outbounds"] = rootOutbounds
+
+	finalOutbounds := make([]any, 0, len(rootOutbounds)+len(resolvedOutbounds))
+	for _, outbound := range rootOutbounds {
+		finalOutbounds = append(finalOutbounds, outbound)
+	}
+	for _, outbound := range resolvedOutbounds {
+		finalOutbounds = append(finalOutbounds, outbound)
+	}
+	raw["outbounds"] = finalOutbounds
 
 	result, err := json.MarshalIndent(raw, "", "  ")
 	if err != nil {

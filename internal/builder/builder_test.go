@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -249,19 +251,19 @@ func TestParseSubscriptionContentParsesSupportedProtocols(t *testing.T) {
 		t.Fatalf("unexpected outbound count: got %d want 5", len(outbounds))
 	}
 
-	if got := outbounds[0]["type"]; got != "shadowsocks" {
+	if got := outbounds[0].Type; got != "shadowsocks" {
 		t.Fatalf("unexpected ss type: %#v", got)
 	}
-	if got := outbounds[1]["type"]; got != "trojan" {
+	if got := outbounds[1].Type; got != "trojan" {
 		t.Fatalf("unexpected trojan type: %#v", got)
 	}
-	if got := outbounds[2]["type"]; got != "vless" {
+	if got := outbounds[2].Type; got != "vless" {
 		t.Fatalf("unexpected vless type: %#v", got)
 	}
-	if got := outbounds[3]["type"]; got != "vmess" {
+	if got := outbounds[3].Type; got != "vmess" {
 		t.Fatalf("unexpected vmess type: %#v", got)
 	}
-	if got := outbounds[4]["type"]; got != "hysteria2" {
+	if got := outbounds[4].Type; got != "hysteria2" {
 		t.Fatalf("unexpected hysteria2 type: %#v", got)
 	}
 }
@@ -276,13 +278,13 @@ func TestParseSubscriptionContentEmojifiesRecognizedCountryPrefix(t *testing.T) 
 		t.Fatalf("parse subscription content: %v", err)
 	}
 
-	if got := outbounds[0]["tag"]; got != "🇺🇸 US-SLC / Trojan" {
+	if got := outbounds[0].Tag; got != "🇺🇸 US-SLC / Trojan" {
 		t.Fatalf("unexpected emojified US tag: %#v", got)
 	}
-	if got := outbounds[1]["tag"]; got != "Node Trojan" {
+	if got := outbounds[1].Tag; got != "Node Trojan" {
 		t.Fatalf("unexpected non-country tag: %#v", got)
 	}
-	if got := outbounds[2]["tag"]; got != "🇬🇧 UK / Trojan" {
+	if got := outbounds[2].Tag; got != "🇬🇧 UK / Trojan" {
 		t.Fatalf("unexpected emojified UK tag: %#v", got)
 	}
 }
@@ -301,7 +303,7 @@ func TestParseSubscriptionContentDecodesBase64Payload(t *testing.T) {
 	if len(outbounds) != 2 {
 		t.Fatalf("unexpected outbound count: got %d want 2", len(outbounds))
 	}
-	if outbounds[0]["type"] != "vmess" || outbounds[1]["type"] != "trojan" {
+	if outbounds[0].Type != "vmess" || outbounds[1].Type != "trojan" {
 		t.Fatalf("unexpected outbound types: %#v", outbounds)
 	}
 }
@@ -322,7 +324,7 @@ func TestParseSubscriptionContentExcludesByPatternAndProtocol(t *testing.T) {
 	if len(outbounds) != 1 {
 		t.Fatalf("unexpected outbound count: got %d want 1", len(outbounds))
 	}
-	if got := outbounds[0]["tag"]; got != "Keep SS" {
+	if got := outbounds[0].Tag; got != "Keep SS" {
 		t.Fatalf("unexpected remaining outbound: %#v", got)
 	}
 }
@@ -351,7 +353,7 @@ func TestParseSubscriptionContentUniquifiesDuplicateTags(t *testing.T) {
 		"Node A (3)",
 	}
 	for i, outbound := range outbounds {
-		if got := outbound["tag"]; got != expectedTags[i] {
+		if got := outbound.Tag; got != expectedTags[i] {
 			t.Fatalf("outbound[%d] tag: got %q want %q", i, got, expectedTags[i])
 		}
 	}
@@ -371,7 +373,7 @@ func TestParseSubscriptionContentAutoDecodesBase64Payload(t *testing.T) {
 	if len(outbounds) != 2 {
 		t.Fatalf("unexpected outbound count: got %d want 2", len(outbounds))
 	}
-	if outbounds[0]["type"] != "vmess" || outbounds[1]["type"] != "trojan" {
+	if outbounds[0].Type != "vmess" || outbounds[1].Type != "trojan" {
 		t.Fatalf("unexpected outbound types: %#v", outbounds)
 	}
 }
@@ -395,46 +397,53 @@ func TestParseShadowsocksLineSupportsSIP002Formats(t *testing.T) {
 		if err != nil {
 			t.Fatalf("parseShadowsocksLine(%q): %v", line, err)
 		}
-		if outbound["type"] != "shadowsocks" {
-			t.Fatalf("unexpected type for %q: %#v", line, outbound)
+		got := outboundAsMap(t, outbound)
+		if got["type"] != "shadowsocks" {
+			t.Fatalf("unexpected type for %q: %#v", line, got)
 		}
-		if outbound["server"] != "server.example.com" || outbound["server_port"] != 9000 {
-			t.Fatalf("unexpected server for %q: %#v", line, outbound)
+		if got["server"] != "server.example.com" || asInt(t, got["server_port"]) != 9000 {
+			t.Fatalf("unexpected server for %q: %#v", line, got)
 		}
-		if outbound["method"] != "chacha20-ietf-poly1305" || outbound["password"] != "pass" {
-			t.Fatalf("unexpected auth fields for %q: %#v", line, outbound)
+		if got["method"] != "chacha20-ietf-poly1305" || got["password"] != "pass" {
+			t.Fatalf("unexpected auth fields for %q: %#v", line, got)
 		}
 	}
 }
 
-func TestOutboundToMapMergesCommonAndExtraFields(t *testing.T) {
+func TestOutboundToMapIncludesProtocolFields(t *testing.T) {
 	outbound := Outbound{
-		Tag:        "node-a",
-		Type:       "vless",
-		Server:     "example.com",
-		ServerPort: 443,
+		Tag:            "node-a",
+		Type:           "vless",
+		Server:         "example.com",
+		ServerPort:     443,
+		UUID:           "11111111-1111-1111-1111-111111111111",
+		PacketEncoding: "xudp",
+		Password:       "secret",
+		Method:         "chacha20-ietf-poly1305",
+		Plugin:         "obfs-local",
+		PluginOpts:     "obfs=http;",
+		Flow:           "xtls-rprx-vision",
+		Security:       "auto",
+		AlterID:        intPtr(0),
+		UpMbps:         intPtr(10),
+		DownMbps:       intPtr(100),
+		Obfs: map[string]any{
+			"type": "salamander",
+		},
 		TLS: map[string]any{
 			"enabled": true,
 		},
 		Transport: map[string]any{
 			"type": "ws",
 		},
-		Extra: map[string]any{
-			"uuid":            "11111111-1111-1111-1111-111111111111",
-			"packet_encoding": "xudp",
-			"tag":             "should-not-override",
-		},
 	}
 
-	got := outbound.ToMap()
-	if got["tag"] != "node-a" {
-		t.Fatalf("tag overridden unexpectedly: %#v", got)
-	}
-	if got["type"] != "vless" || got["server"] != "example.com" || got["server_port"] != 443 {
+	got := outboundAsMap(t, outbound)
+	if got["type"] != "vless" || got["server"] != "example.com" || asInt(t, got["server_port"]) != 443 {
 		t.Fatalf("missing common fields: %#v", got)
 	}
-	if got["uuid"] != "11111111-1111-1111-1111-111111111111" || got["packet_encoding"] != "xudp" {
-		t.Fatalf("missing extra fields: %#v", got)
+	if got["uuid"] != "11111111-1111-1111-1111-111111111111" || got["packet_encoding"] != "xudp" || got["password"] != "secret" {
+		t.Fatalf("missing protocol fields: %#v", got)
 	}
 }
 
@@ -445,28 +454,29 @@ func TestParseVLESSLineBuildsExpectedOutbound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseVLESSLine: %v", err)
 	}
+	got := outboundAsMap(t, outbound)
 
-	if outbound["type"] != "vless" || outbound["tag"] != "Node VLESS" {
-		t.Fatalf("unexpected base fields: %#v", outbound)
+	if got["type"] != "vless" || got["tag"] != "Node VLESS" {
+		t.Fatalf("unexpected base fields: %#v", got)
 	}
-	if outbound["server"] != "example.com" || outbound["server_port"] != 443 {
-		t.Fatalf("unexpected server fields: %#v", outbound)
+	if got["server"] != "example.com" || asInt(t, got["server_port"]) != 443 {
+		t.Fatalf("unexpected server fields: %#v", got)
 	}
-	if outbound["uuid"] != "11111111-1111-1111-1111-111111111111" {
-		t.Fatalf("unexpected uuid: %#v", outbound)
+	if got["uuid"] != "11111111-1111-1111-1111-111111111111" {
+		t.Fatalf("unexpected uuid: %#v", got)
 	}
-	if outbound["packet_encoding"] != "packetaddr" {
-		t.Fatalf("unexpected packet_encoding: %#v", outbound)
+	if got["packet_encoding"] != "packetaddr" {
+		t.Fatalf("unexpected packet_encoding: %#v", got)
 	}
 
-	tls, ok := outbound["tls"].(map[string]any)
+	tls, ok := got["tls"].(map[string]any)
 	if !ok || tls["enabled"] != true || tls["server_name"] != "example.com" {
-		t.Fatalf("unexpected tls: %#v", outbound["tls"])
+		t.Fatalf("unexpected tls: %#v", got["tls"])
 	}
 
-	transport, ok := outbound["transport"].(map[string]any)
+	transport, ok := got["transport"].(map[string]any)
 	if !ok || transport["type"] != "ws" || transport["path"] != "/ws" {
-		t.Fatalf("unexpected transport: %#v", outbound["transport"])
+		t.Fatalf("unexpected transport: %#v", got["transport"])
 	}
 	headers, ok := transport["headers"].(map[string]any)
 	if !ok || headers["Host"] != "cdn.example.com" {
@@ -481,10 +491,11 @@ func TestParseVLESSLineRealityAddsTLSBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseVLESSLine: %v", err)
 	}
+	got := outboundAsMap(t, outbound)
 
-	tls, ok := outbound["tls"].(map[string]any)
+	tls, ok := got["tls"].(map[string]any)
 	if !ok {
-		t.Fatalf("tls block missing: %#v", outbound)
+		t.Fatalf("tls block missing: %#v", got)
 	}
 	reality, ok := tls["reality"].(map[string]any)
 	if !ok || reality["enabled"] != true || reality["public_key"] != "pubkey123" || reality["short_id"] != "abcd" {
@@ -496,13 +507,13 @@ func TestParseVLESSLineRealityAddsTLSBlocks(t *testing.T) {
 	}
 }
 
-func TestBuildShadowsocksPluginExtra(t *testing.T) {
-	extra := buildShadowsocksPluginExtra("obfs-local;obfs=http;obfs-host=example.com")
-	if extra["plugin"] != "obfs-local" {
-		t.Fatalf("unexpected plugin field: %#v", extra)
+func TestParseShadowsocksPlugin(t *testing.T) {
+	plugin, pluginOpts := parseShadowsocksPlugin("obfs-local;obfs=http;obfs-host=example.com")
+	if plugin != "obfs-local" {
+		t.Fatalf("unexpected plugin field: %q", plugin)
 	}
-	if extra["plugin_opts"] != "obfs=http;obfs-host=example.com;" {
-		t.Fatalf("unexpected plugin_opts field: %#v", extra)
+	if pluginOpts != "obfs=http;obfs-host=example.com;" {
+		t.Fatalf("unexpected plugin_opts field: %q", pluginOpts)
 	}
 }
 
@@ -528,7 +539,7 @@ func TestParseHysteria2LineSetsInsecureWhenSNIMissing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseHysteria2Line: %v", err)
 	}
-	tls, ok := outbound["tls"].(map[string]any)
+	tls, ok := outboundAsMap(t, outbound)["tls"].(map[string]any)
 	if !ok {
 		t.Fatalf("tls block missing: %#v", outbound)
 	}
@@ -537,6 +548,106 @@ func TestParseHysteria2LineSetsInsecureWhenSNIMissing(t *testing.T) {
 	}
 }
 
+func TestProtocolParsingFixture(t *testing.T) {
+	content := stringsJoinLines(
+		"ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpwYXNz@server.example.com:9000?plugin=obfs-local%3Bobfs%3Dhttp%3Bobfs-host%3Dcdn.example.com#Node%20SS",
+		"trojan://secret@example.com:443?type=ws&host=cdn.example.com&path=%2Fws&sni=example.com#Node%20Trojan",
+		"vless://11111111-1111-1111-1111-111111111111@example.com:443?type=grpc&security=reality&pbk=pubkey123&sid=abcd&fp=chrome&serviceName=grpc-vless#Node%20VLESS",
+		"vmess://eyJhZGQiOiJ2bWVzcy5leGFtcGxlLmNvbSIsImFpZCI6IjAiLCJob3N0IjoiY2RuLmV4YW1wbGUuY29tIiwiaWQiOiIyMjIyMjIyMi0yMjIyLTIyMjItMjIyMi0yMjIyMjIyMjIyMjIiLCJuZXQiOiJ3cyIsInBhdGgiOiIvd2M/ZWQ9MTAyNCIsInBvcnQiOiI0NDMiLCJwcyI6Ik5vZGUgVk1lc3MiLCJzY3kiOiJhdXRvIiwic25pIjoidm1lc3MuZXhhbXBsZS5jb20iLCJ0bHMiOiJ0bHMifQ==",
+		"hysteria2://password@example.com:443?sni=example.com&obfs=salamander&obfs-password=obfspass#Node%20HY2",
+	)
+
+	outbounds, err := parseSubscriptionContent([]byte(content), "remote", BuildOptions{})
+	if err != nil {
+		t.Fatalf("parse subscription content: %v", err)
+	}
+
+	actual, err := json.MarshalIndent(toOutboundMaps(outbounds), "", "  ")
+	if err != nil {
+		t.Fatalf("marshal actual: %v", err)
+	}
+	actual = append(actual, '\n')
+
+	expectedPath := filepath.Join("testdata", "expected", "protocol_parsing.json")
+	expected, err := os.ReadFile(expectedPath)
+	if err != nil {
+		t.Fatalf("read expected fixture: %v", err)
+	}
+	if string(actual) != string(expected) {
+		t.Fatalf("protocol parsing output mismatch with fixture")
+	}
+}
+
+func TestXeovoSampleFixture(t *testing.T) {
+	samplePath := filepath.Join("testdata", "subscriptions", "xeovo_sample.txt")
+	content, err := os.ReadFile(samplePath)
+	if err != nil {
+		t.Fatalf("read sample subscription: %v", err)
+	}
+
+	outbounds, err := parseSubscriptionContent(content, "remote", BuildOptions{})
+	if err != nil {
+		t.Fatalf("parse sample subscription: %v", err)
+	}
+
+	actual, err := json.MarshalIndent(toOutboundMaps(outbounds), "", "  ")
+	if err != nil {
+		t.Fatalf("marshal sample output: %v", err)
+	}
+	actual = append(actual, '\n')
+
+	expectedPath := filepath.Join("testdata", "expected", "xeovo_sample.json")
+	expected, err := os.ReadFile(expectedPath)
+	if err != nil {
+		t.Fatalf("read expected fixture: %v", err)
+	}
+	if string(actual) != string(expected) {
+		t.Fatalf("xeovo sample output mismatch with fixture")
+	}
+}
+
 func stringsJoinLines(lines ...string) string {
 	return fmt.Sprintf("%s\n", strings.Join(lines, "\n"))
+}
+
+func toOutboundMaps(items []Outbound) []map[string]any {
+	out := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		data, err := json.Marshal(item)
+		if err != nil {
+			panic(err)
+		}
+		entry := map[string]any{}
+		if err := json.Unmarshal(data, &entry); err != nil {
+			panic(err)
+		}
+		out = append(out, entry)
+	}
+	return out
+}
+
+func outboundAsMap(t *testing.T, item Outbound) map[string]any {
+	t.Helper()
+	data, err := json.Marshal(item)
+	if err != nil {
+		t.Fatalf("marshal outbound: %v", err)
+	}
+	entry := map[string]any{}
+	if err := json.Unmarshal(data, &entry); err != nil {
+		t.Fatalf("unmarshal outbound: %v", err)
+	}
+	return entry
+}
+
+func asInt(t *testing.T, value any) int {
+	t.Helper()
+	switch typed := value.(type) {
+	case float64:
+		return int(typed)
+	case int:
+		return typed
+	default:
+		t.Fatalf("expected numeric value, got %T (%v)", value, value)
+		return 0
+	}
 }
