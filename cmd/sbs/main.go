@@ -120,7 +120,7 @@ func loadHostConfig(path string) (*HostConfig, error) {
 	return &cfg, nil
 }
 
-func runServer(cfg *HostConfig, displayHostname string) error {
+func runServer(cfg *HostConfig, hostname string) error {
 	if err := validateHostConfig(cfg); err != nil {
 		return err
 	}
@@ -194,17 +194,17 @@ func runServer(cfg *HostConfig, displayHostname string) error {
 		listenPort = p
 	}
 
-	displayHost := displayHostname
-	if displayHost == "" {
-		displayHost = "127.0.0.1"
+	host := hostname
+	if host == "" {
+		host = "127.0.0.1"
 	}
 	if listenPort != 443 {
-		displayHost = fmt.Sprintf("%s:%d", displayHost, listenPort)
+		host = fmt.Sprintf("%s:%d", host, listenPort)
 	}
-	fmt.Printf("Config server running on https://%s\n", displayHost)
+	fmt.Printf("Config server running on https://%s\n", host)
 	fmt.Println("URLs:")
 	for _, tmpl := range cfg.Templates {
-		fmt.Printf("  https://%s/config?token=%s\n", displayHost, tmpl.Token)
+		fmt.Printf("  https://%s/config?token=%s\n", host, tmpl.Token)
 	}
 
 	server := &http.Server{Handler: mux}
