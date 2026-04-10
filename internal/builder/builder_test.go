@@ -359,6 +359,28 @@ func TestParseSubscriptionContentUniquifiesDuplicateTags(t *testing.T) {
 	}
 }
 
+func TestParseSubscriptionContentSkipsExactDuplicates(t *testing.T) {
+	outbounds, err := parseSubscriptionContent([]byte(stringsJoinLines(
+		"trojan://pass@2.2.2.2:443#Node%20A",
+		"trojan://pass@2.2.2.2:443#Node%20A",
+		"trojan://pass@2.2.2.2:444#Node%20A",
+	)), "remote", BuildOptions{})
+	if err != nil {
+		t.Fatalf("parse subscription content: %v", err)
+	}
+
+	if len(outbounds) != 2 {
+		t.Fatalf("unexpected outbound count: got %d want 2", len(outbounds))
+	}
+
+	if outbounds[0].Tag != "Node A" {
+		t.Fatalf("unexpected first tag: %q", outbounds[0].Tag)
+	}
+	if outbounds[1].Tag != "Node A (2)" {
+		t.Fatalf("unexpected second tag: %q", outbounds[1].Tag)
+	}
+}
+
 func TestParseSubscriptionContentAutoDecodesBase64Payload(t *testing.T) {
 	content := base64.StdEncoding.EncodeToString([]byte(
 		"vmess://eyJhZGQiOiJ2bWVzcy5leGFtcGxlLmNvbSIsImFpZCI6IjAiLCJob3N0IjoiY2RuLmV4YW1wbGUuY29tIiwiaWQiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTExIiwibmV0Ijoid3MiLCJwYXRoIjoiL3dzIiwicG9ydCI6IjQ0MyIsInBzIjoibm9kZS1hIiwic2N5IjoiYXV0byIsInNuaSI6InZtZXNzLmV4YW1wbGUuY29tIiwidGxzIjoidGxzIn0=\n" +
@@ -428,6 +450,38 @@ func TestParseSubscriptionContentAutoDetectsClashFormat(t *testing.T) {
 	}
 	if len(outbounds) != 10 {
 		t.Fatalf("unexpected outbound count: got %d want 10", len(outbounds))
+	}
+}
+
+func TestParseSubscriptionContentClashDedupesEquivalentWSPathForms(t *testing.T) {
+	content := []byte(`proxies:
+- name: "🇺🇰 xeovo uk-global2 (VLESS (WS+TLS))"
+  network: ws
+  port: 443
+  server: uk-global2.xeovo.net
+  servername: uk-global2.xeovo.net
+  tls: true
+  type: vless
+  uuid: ffe8ae49-05d7-4f56-a82b-dd618108c270
+  ws-opts:
+    path: /potos
+- name: "🇺🇰 xeovo uk-global2 (VLESS (WS+TLS))"
+  network: ws
+  port: 443
+  server: uk-global2.xeovo.net
+  servername: uk-global2.xeovo.net
+  tls: true
+  type: vless
+  uuid: ffe8ae49-05d7-4f56-a82b-dd618108c270
+  ws-path: /potos
+`)
+
+	outbounds, err := parseSubscriptionContent(content, "remote", BuildOptions{Format: "clash"})
+	if err != nil {
+		t.Fatalf("parse clash content: %v", err)
+	}
+	if len(outbounds) != 1 {
+		t.Fatalf("unexpected outbound count: got %d want 1", len(outbounds))
 	}
 }
 

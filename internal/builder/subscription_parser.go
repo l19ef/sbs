@@ -18,21 +18,29 @@ func parseSubscriptionContent(data []byte, tagPrefix string, options BuildOption
 
 	switch format {
 	case "uri":
-		return parseURIContent(data, tagPrefix, options)
+		outbounds, err := parseURIContent(data, tagPrefix, options)
+		if err != nil {
+			return nil, err
+		}
+		return postProcessOutbounds(outbounds, options), nil
 	case "clash":
-		return parseClashContent(data, tagPrefix, options)
+		outbounds, err := parseClashContent(data, tagPrefix)
+		if err != nil {
+			return nil, err
+		}
+		return postProcessOutbounds(outbounds, options), nil
 	case "auto":
 		outbounds, err := parseURIContent(data, tagPrefix, options)
 		if err == nil {
-			return outbounds, nil
+			return postProcessOutbounds(outbounds, options), nil
 		}
 		if !errors.Is(err, errNoValidSubscriptionNodes) {
 			return nil, err
 		}
 
-		clashOutbounds, clashErr := parseClashContent(data, tagPrefix, options)
+		clashOutbounds, clashErr := parseClashContent(data, tagPrefix)
 		if clashErr == nil {
-			return clashOutbounds, nil
+			return postProcessOutbounds(clashOutbounds, options), nil
 		}
 		return nil, err
 	default:
@@ -50,25 +58,17 @@ func parseURIContent(data []byte, tagPrefix string, options BuildOptions) ([]Out
 
 	switch encoding {
 	case "plain":
-		outbounds, err := parseSubscriptionText(plainText, tagPrefix, options)
-		if err != nil {
-			return nil, err
-		}
-		return postProcessOutbounds(outbounds, options), nil
+		return parseSubscriptionText(plainText, tagPrefix, options)
 	case "base64":
 		decoded, err := decodeBase64(data)
 		if err != nil {
 			return nil, fmt.Errorf("decode base64 subscription: %w", err)
 		}
-		outbounds, err := parseSubscriptionText(normalizeSubscriptionText(string(decoded)), tagPrefix, options)
-		if err != nil {
-			return nil, err
-		}
-		return postProcessOutbounds(outbounds, options), nil
+		return parseSubscriptionText(normalizeSubscriptionText(string(decoded)), tagPrefix, options)
 	case "auto":
 		outbounds, err := parseSubscriptionText(plainText, tagPrefix, options)
 		if err == nil {
-			return postProcessOutbounds(outbounds, options), nil
+			return outbounds, nil
 		}
 		if !errors.Is(err, errNoValidSubscriptionNodes) {
 			return nil, err
@@ -78,11 +78,7 @@ func parseURIContent(data []byte, tagPrefix string, options BuildOptions) ([]Out
 		if decodeErr != nil {
 			return nil, err
 		}
-		decodedOutbounds, parseErr := parseSubscriptionText(normalizeSubscriptionText(string(decoded)), tagPrefix, options)
-		if parseErr != nil {
-			return nil, parseErr
-		}
-		return postProcessOutbounds(decodedOutbounds, options), nil
+		return parseSubscriptionText(normalizeSubscriptionText(string(decoded)), tagPrefix, options)
 	default:
 		return nil, fmt.Errorf("unsupported encoding %q (expected auto, plain, or base64)", options.Encoding)
 	}
@@ -163,7 +159,8 @@ func fallbackTag(prefix, protocol string, index int) string {
 }
 
 func postProcessOutbounds(outbounds []Outbound, options BuildOptions) []Outbound {
-	filtered := filterOutbounds(outbounds, options)
+	filtered := dedupeOutbounds(outbounds)
+	filtered = filterOutbounds(filtered, options)
 	filtered = ensureTagUniqueness(filtered)
 	if !options.Emojify {
 		return filtered
@@ -179,6 +176,29 @@ func postProcessOutbounds(outbounds []Outbound, options BuildOptions) []Outbound
 		}
 	}
 	return filtered
+}
+
+func dedupeOutbounds(outbounds []Outbound) []Outbound {
+	if len(outbounds) < 2 {
+		return outbounds
+	}
+
+	seen := make(map[string]struct{}, len(outbounds))
+	result := make([]Outbound, 0, len(outbounds))
+	for _, outbound := range outbounds {
+		fingerprint, err := outboundFingerprint(outbound)
+		if err != nil {
+			result = append(result, outbound)
+			continue
+		}
+		if _, exists := seen[fingerprint]; exists {
+			continue
+		}
+		seen[fingerprint] = struct{}{}
+		result = append(result, outbound)
+	}
+
+	return result
 }
 
 func filterOutbounds(outbounds []Outbound, options BuildOptions) []Outbound {

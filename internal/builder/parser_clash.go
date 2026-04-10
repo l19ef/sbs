@@ -34,7 +34,7 @@ type clashWSOptions struct {
 	Headers map[string]string `yaml:"headers"`
 }
 
-func parseClashContent(data []byte, tagPrefix string, options BuildOptions) ([]Outbound, error) {
+func parseClashContent(data []byte, tagPrefix string) ([]Outbound, error) {
 	var doc clashSubscription
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return nil, fmt.Errorf("parse clash yaml: %w", err)
@@ -62,7 +62,7 @@ func parseClashContent(data []byte, tagPrefix string, options BuildOptions) ([]O
 		return nil, errNoValidSubscriptionNodes
 	}
 
-	return postProcessOutbounds(outbounds, options), nil
+	return outbounds, nil
 }
 
 func parseClashProxy(proxy clashProxy, fallback string) (Outbound, bool, error) {

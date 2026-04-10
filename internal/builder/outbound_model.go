@@ -1,5 +1,7 @@
 package builder
 
+import "encoding/json"
+
 type Outbound struct {
 	Tag        string         `json:"tag"`
 	Type       string         `json:"type"`
@@ -57,4 +59,12 @@ func collectOutboundTags(items []Outbound) []string {
 		}
 	}
 	return tags
+}
+
+func outboundFingerprint(outbound Outbound) (string, error) {
+	payload, err := json.Marshal(outbound)
+	if err != nil {
+		return "", err
+	}
+	return string(payload), nil
 }
