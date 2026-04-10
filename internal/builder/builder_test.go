@@ -385,6 +385,59 @@ func TestParseSubscriptionContentRejectsInvalidEncodingOption(t *testing.T) {
 	}
 }
 
+func TestParseSubscriptionContentParsesClashFormat(t *testing.T) {
+	fixturePath := filepath.Join("testdata", "subscriptions", "xeovo_clash_sample.yaml")
+	content, err := os.ReadFile(fixturePath)
+	if err != nil {
+		t.Fatalf("read clash fixture: %v", err)
+	}
+
+	outbounds, err := parseSubscriptionContent(content, "remote", BuildOptions{Format: "clash"})
+	if err != nil {
+		t.Fatalf("parse clash content: %v", err)
+	}
+
+	if len(outbounds) != 10 {
+		t.Fatalf("unexpected outbound count: got %d want 10", len(outbounds))
+	}
+
+	if outbounds[0].Type != "hysteria2" || outbounds[0].Tag != "🇺🇸 xeovo us-slc-hysteria1 (Hysteria2)" {
+		t.Fatalf("unexpected first outbound: %#v", outbounds[0])
+	}
+	if outbounds[1].Type != "vless" || outbounds[1].Transport == nil {
+		t.Fatalf("unexpected vless outbound: %#v", outbounds[1])
+	}
+	if outbounds[2].Type != "shadowsocks" || outbounds[2].Method != "chacha20-ietf-poly1305" {
+		t.Fatalf("unexpected shadowsocks outbound: %#v", outbounds[2])
+	}
+	if outbounds[4].Type != "vmess" || outbounds[4].AlterID == nil || *outbounds[4].AlterID != 0 {
+		t.Fatalf("unexpected vmess outbound: %#v", outbounds[4])
+	}
+}
+
+func TestParseSubscriptionContentAutoDetectsClashFormat(t *testing.T) {
+	fixturePath := filepath.Join("testdata", "subscriptions", "xeovo_clash_sample.yaml")
+	content, err := os.ReadFile(fixturePath)
+	if err != nil {
+		t.Fatalf("read clash fixture: %v", err)
+	}
+
+	outbounds, err := parseSubscriptionContent(content, "remote", BuildOptions{})
+	if err != nil {
+		t.Fatalf("auto parse clash content: %v", err)
+	}
+	if len(outbounds) != 10 {
+		t.Fatalf("unexpected outbound count: got %d want 10", len(outbounds))
+	}
+}
+
+func TestParseSubscriptionContentRejectsInvalidFormatOption(t *testing.T) {
+	_, err := parseSubscriptionContent([]byte("trojan://secret@example.com:443#n1\n"), "remote", BuildOptions{Format: "wireguard"})
+	if err == nil {
+		t.Fatalf("expected unsupported format error")
+	}
+}
+
 func TestParseShadowsocksLineSupportsSIP002Formats(t *testing.T) {
 	tests := []string{
 		"ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpwYXNz@server.example.com:9000#NodeA",

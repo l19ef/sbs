@@ -7,6 +7,7 @@ type subscriptionSource struct {
 	Exclude          []string `json:"exclude"`
 	ExcludeProtocols []string `json:"exclude_protocols"`
 	Encoding         string   `json:"encoding"`
+	Format           string   `json:"format"`
 }
 
 type outboundContainer struct {
@@ -18,4 +19,5 @@ type BuildOptions struct {
 	ExcludePatterns  []string
 	ExcludeProtocols []string
 	Encoding         string
+	Format           string
 }

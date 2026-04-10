@@ -66,6 +66,7 @@ Validation rules for effective serve config (JSON + CLI flags):
     {
       "tag": "main",
       "url": "https://example.com/sub",
+      "format": "auto",
       "emojify": true,
       "exclude": ["ads"],
       "exclude_protocols": ["hysteria2"]
@@ -83,6 +84,7 @@ Validation rules for effective serve config (JSON + CLI flags):
 | `exclude` | string[] | Substrings to exclude by tag |
 | `exclude_protocols` | string[] | Protocol types to exclude |
 | `encoding` | string | `auto` (default), `plain`, or `base64` |
+| `format` | string | `auto` (default), `uri`, or `clash` |
 
 #### Emoji tags
 
@@ -101,3 +103,8 @@ With `"emojify": true`, country codes are converted to flag emojis:
 - **VLESS** — `vless://...`
 - **Trojan** — `trojan://...`
 - **Hysteria2** — `hysteria2://...` or `hy2://...`
+
+### Supported subscription formats
+
+- **URI** — newline-separated `ss://`, `trojan://`, `vless://`, `vmess://`, `hysteria2://`
+- **Clash YAML** — `proxies:` list (group sections are ignored)

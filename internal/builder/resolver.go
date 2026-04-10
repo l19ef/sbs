@@ -35,6 +35,7 @@ func (r *subscriptionResolver) resolve(tag string) ([]Outbound, error) {
 		ExcludePatterns:  source.Exclude,
 		ExcludeProtocols: source.ExcludeProtocols,
 		Encoding:         source.Encoding,
+		Format:           source.Format,
 	}
 
 	items, err := parseSubscriptionContent(data, tag, options)

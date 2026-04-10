@@ -11,6 +11,36 @@ var countryPrefixPattern = regexp.MustCompile(`^([A-Z]{2})(?:$|[^A-Za-z])`)
 var errNoValidSubscriptionNodes = errors.New("no valid subscription nodes found")
 
 func parseSubscriptionContent(data []byte, tagPrefix string, options BuildOptions) ([]Outbound, error) {
+	format := strings.ToLower(strings.TrimSpace(options.Format))
+	if format == "" {
+		format = "auto"
+	}
+
+	switch format {
+	case "uri":
+		return parseURIContent(data, tagPrefix, options)
+	case "clash":
+		return parseClashContent(data, tagPrefix, options)
+	case "auto":
+		outbounds, err := parseURIContent(data, tagPrefix, options)
+		if err == nil {
+			return outbounds, nil
+		}
+		if !errors.Is(err, errNoValidSubscriptionNodes) {
+			return nil, err
+		}
+
+		clashOutbounds, clashErr := parseClashContent(data, tagPrefix, options)
+		if clashErr == nil {
+			return clashOutbounds, nil
+		}
+		return nil, err
+	default:
+		return nil, fmt.Errorf("unsupported format %q (expected auto, uri, or clash)", options.Format)
+	}
+}
+
+func parseURIContent(data []byte, tagPrefix string, options BuildOptions) ([]Outbound, error) {
 	encoding := strings.ToLower(strings.TrimSpace(options.Encoding))
 	if encoding == "" {
 		encoding = "auto"
@@ -20,17 +50,25 @@ func parseSubscriptionContent(data []byte, tagPrefix string, options BuildOption
 
 	switch encoding {
 	case "plain":
-		return parseSubscriptionText(plainText, tagPrefix, options)
+		outbounds, err := parseSubscriptionText(plainText, tagPrefix, options)
+		if err != nil {
+			return nil, err
+		}
+		return postProcessOutbounds(outbounds, options), nil
 	case "base64":
 		decoded, err := decodeBase64(data)
 		if err != nil {
 			return nil, fmt.Errorf("decode base64 subscription: %w", err)
 		}
-		return parseSubscriptionText(normalizeSubscriptionText(string(decoded)), tagPrefix, options)
+		outbounds, err := parseSubscriptionText(normalizeSubscriptionText(string(decoded)), tagPrefix, options)
+		if err != nil {
+			return nil, err
+		}
+		return postProcessOutbounds(outbounds, options), nil
 	case "auto":
 		outbounds, err := parseSubscriptionText(plainText, tagPrefix, options)
 		if err == nil {
-			return outbounds, nil
+			return postProcessOutbounds(outbounds, options), nil
 		}
 		if !errors.Is(err, errNoValidSubscriptionNodes) {
 			return nil, err
@@ -40,7 +78,11 @@ func parseSubscriptionContent(data []byte, tagPrefix string, options BuildOption
 		if decodeErr != nil {
 			return nil, err
 		}
-		return parseSubscriptionText(normalizeSubscriptionText(string(decoded)), tagPrefix, options)
+		decodedOutbounds, parseErr := parseSubscriptionText(normalizeSubscriptionText(string(decoded)), tagPrefix, options)
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		return postProcessOutbounds(decodedOutbounds, options), nil
 	default:
 		return nil, fmt.Errorf("unsupported encoding %q (expected auto, plain, or base64)", options.Encoding)
 	}
@@ -73,7 +115,7 @@ func parseSubscriptionText(text, tagPrefix string, options BuildOptions) ([]Outb
 		return nil, errNoValidSubscriptionNodes
 	}
 
-	return postProcessOutbounds(outbounds, options), nil
+	return outbounds, nil
 }
 
 func parseSubscriptionLine(line, tagPrefix string, index int) (Outbound, bool, error) {

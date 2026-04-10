@@ -1,0 +1,94 @@
+proxies:
+- name: 🇺🇸 xeovo us-slc-hysteria1 (Hysteria2)
+  password: ffe8ae49-05d7-4f56-a82b-dd618108c270
+  port: 443
+  server: 192.166.82.244
+  servername: us-slc-hysteria1.xeovo.net
+  sni: us-slc-hysteria1.xeovo.net
+  type: hysteria2
+- name: 🇺🇸 xeovo us-slc-global1 (VLESS (WS+TLS))
+  network: ws
+  port: 443
+  server: us-slc-global1.xeovo.eu
+  servername: us-slc-global1.xeovo.eu
+  tls: true
+  type: vless
+  uuid: ffe8ae49-05d7-4f56-a82b-dd618108c270
+  ws-path: /potosi
+- cipher: chacha20-ietf-poly1305
+  name: 🇺🇸 xeovo us-slc-global1 (Shadowsocks)
+  password: pn6E56A7qktsmFhNR1Tl2sbahAhK
+  port: 9000
+  server: us-slc-global1.xeovo.eu
+  type: ss
+- name: 🇺🇸 xeovo us-slc-global1 (Trojan (WS+TLS))
+  network: ws
+  password: mFhNR1Tl2sbahAhK
+  port: 443
+  server: us-slc-global1.xeovo.eu
+  sni: us-slc-global1.xeovo.eu
+  tls: true
+  type: trojan
+  ws-opts:
+    path: /colcha
+- alterId: 0
+  cipher: auto
+  name: 🇺🇸 xeovo us-slc-global1 (VMess (WS+TLS))
+  network: ws
+  port: 443
+  server: us-slc-global1.xeovo.eu
+  servername: us-slc-global1.xeovo.eu
+  tls: true
+  type: vmess
+  uuid: ffe8ae49-05d7-4f56-a82b-dd618108c270
+  ws-opts:
+    path: /sacaca
+- name: 🇺🇸 xeovo us-nyc-hysteria2 (Hysteria2)
+  password: ffe8ae49-05d7-4f56-a82b-dd618108c270
+  port: 443
+  server: 38.135.25.189
+  servername: us-nyc-hysteria2.xeovo.net
+  sni: us-nyc-hysteria2.xeovo.net
+  type: hysteria2
+- name: 🇺🇸 xeovo us-nyc-global2 (VLESS (WS+TLS))
+  network: ws
+  port: 443
+  server: us-nyc-global2.xeovo.net
+  servername: us-nyc-global2.xeovo.net
+  tls: true
+  type: vless
+  uuid: ffe8ae49-05d7-4f56-a82b-dd618108c270
+  ws-opts:
+    path: /potosi
+- cipher: chacha20-ietf-poly1305
+  name: 🇺🇸 xeovo us-nyc-global2 (Shadowsocks)
+  password: pn6E56A7qktsmFhNR1Tl2sbahAhK
+  port: 9000
+  server: us-nyc-global2.xeovo.net
+  type: ss
+- name: 🇺🇸 xeovo us-nyc-global2 (Trojan (TLS))
+  password: mFhNR1Tl2sbahAhK
+  port: 444
+  server: us-nyc-global2.xeovo.net
+  sni: us-nyc-global2.xeovo.net
+  tls: true
+  type: trojan
+- alterId: 0
+  cipher: auto
+  name: 🇺🇸 xeovo us-nyc-global2 (VMess (WS+TLS))
+  network: ws
+  port: 443
+  server: us-nyc-global2.xeovo.net
+  servername: us-nyc-global2.xeovo.net
+  tls: true
+  type: vmess
+  uuid: ffe8ae49-05d7-4f56-a82b-dd618108c270
+  ws-opts:
+    path: /sacaca
+
+proxy-groups:
+- name: xeovo - Hysteria2
+  proxies:
+  - 🇺🇸 xeovo us-slc-hysteria1 (Hysteria2)
+  - 🇺🇸 xeovo us-nyc-hysteria2 (Hysteria2)
+  type: select
