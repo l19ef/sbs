@@ -407,6 +407,136 @@ func TestParseShadowsocksLineSupportsSIP002Formats(t *testing.T) {
 	}
 }
 
+func TestOutboundToMapMergesCommonAndExtraFields(t *testing.T) {
+	outbound := Outbound{
+		Tag:        "node-a",
+		Type:       "vless",
+		Server:     "example.com",
+		ServerPort: 443,
+		TLS: map[string]any{
+			"enabled": true,
+		},
+		Transport: map[string]any{
+			"type": "ws",
+		},
+		Extra: map[string]any{
+			"uuid":            "11111111-1111-1111-1111-111111111111",
+			"packet_encoding": "xudp",
+			"tag":             "should-not-override",
+		},
+	}
+
+	got := outbound.ToMap()
+	if got["tag"] != "node-a" {
+		t.Fatalf("tag overridden unexpectedly: %#v", got)
+	}
+	if got["type"] != "vless" || got["server"] != "example.com" || got["server_port"] != 443 {
+		t.Fatalf("missing common fields: %#v", got)
+	}
+	if got["uuid"] != "11111111-1111-1111-1111-111111111111" || got["packet_encoding"] != "xudp" {
+		t.Fatalf("missing extra fields: %#v", got)
+	}
+}
+
+func TestParseVLESSLineBuildsExpectedOutbound(t *testing.T) {
+	line := "vless://11111111-1111-1111-1111-111111111111@example.com:443?type=ws&security=tls&sni=example.com&host=cdn.example.com&path=%2Fws&packetEncoding=packetaddr#Node%20VLESS"
+
+	outbound, err := parseVLESSLine(line, "fallback")
+	if err != nil {
+		t.Fatalf("parseVLESSLine: %v", err)
+	}
+
+	if outbound["type"] != "vless" || outbound["tag"] != "Node VLESS" {
+		t.Fatalf("unexpected base fields: %#v", outbound)
+	}
+	if outbound["server"] != "example.com" || outbound["server_port"] != 443 {
+		t.Fatalf("unexpected server fields: %#v", outbound)
+	}
+	if outbound["uuid"] != "11111111-1111-1111-1111-111111111111" {
+		t.Fatalf("unexpected uuid: %#v", outbound)
+	}
+	if outbound["packet_encoding"] != "packetaddr" {
+		t.Fatalf("unexpected packet_encoding: %#v", outbound)
+	}
+
+	tls, ok := outbound["tls"].(map[string]any)
+	if !ok || tls["enabled"] != true || tls["server_name"] != "example.com" {
+		t.Fatalf("unexpected tls: %#v", outbound["tls"])
+	}
+
+	transport, ok := outbound["transport"].(map[string]any)
+	if !ok || transport["type"] != "ws" || transport["path"] != "/ws" {
+		t.Fatalf("unexpected transport: %#v", outbound["transport"])
+	}
+	headers, ok := transport["headers"].(map[string]any)
+	if !ok || headers["Host"] != "cdn.example.com" {
+		t.Fatalf("unexpected transport headers: %#v", transport)
+	}
+}
+
+func TestParseVLESSLineRealityAddsTLSBlocks(t *testing.T) {
+	line := "vless://11111111-1111-1111-1111-111111111111@reality.example:443?security=reality&pbk=pubkey123&sid=abcd&fp=chrome#Reality"
+
+	outbound, err := parseVLESSLine(line, "fallback")
+	if err != nil {
+		t.Fatalf("parseVLESSLine: %v", err)
+	}
+
+	tls, ok := outbound["tls"].(map[string]any)
+	if !ok {
+		t.Fatalf("tls block missing: %#v", outbound)
+	}
+	reality, ok := tls["reality"].(map[string]any)
+	if !ok || reality["enabled"] != true || reality["public_key"] != "pubkey123" || reality["short_id"] != "abcd" {
+		t.Fatalf("unexpected reality block: %#v", tls)
+	}
+	utls, ok := tls["utls"].(map[string]any)
+	if !ok || utls["enabled"] != true || utls["fingerprint"] != "chrome" {
+		t.Fatalf("unexpected utls block: %#v", tls)
+	}
+}
+
+func TestBuildShadowsocksPluginExtra(t *testing.T) {
+	extra := buildShadowsocksPluginExtra("obfs-local;obfs=http;obfs-host=example.com")
+	if extra["plugin"] != "obfs-local" {
+		t.Fatalf("unexpected plugin field: %#v", extra)
+	}
+	if extra["plugin_opts"] != "obfs=http;obfs-host=example.com;" {
+		t.Fatalf("unexpected plugin_opts field: %#v", extra)
+	}
+}
+
+func TestBuildVMessTransportWSWithEarlyData(t *testing.T) {
+	transport := buildVMessTransport("ws", map[string]any{
+		"host": "cdn.example.com",
+		"path": "/ws?ed=2048",
+	})
+	if transport == nil || transport["type"] != "ws" {
+		t.Fatalf("unexpected transport: %#v", transport)
+	}
+	if transport["path"] != "/ws" || transport["max_early_data"] != 2048 {
+		t.Fatalf("unexpected ws transport fields: %#v", transport)
+	}
+	headers, ok := transport["headers"].(map[string]any)
+	if !ok || headers["Host"] != "cdn.example.com" {
+		t.Fatalf("unexpected ws headers: %#v", transport)
+	}
+}
+
+func TestParseHysteria2LineSetsInsecureWhenSNIMissing(t *testing.T) {
+	outbound, err := parseHysteria2Line("hysteria2://pass@example.com:443#Node", "fallback")
+	if err != nil {
+		t.Fatalf("parseHysteria2Line: %v", err)
+	}
+	tls, ok := outbound["tls"].(map[string]any)
+	if !ok {
+		t.Fatalf("tls block missing: %#v", outbound)
+	}
+	if tls["insecure"] != true {
+		t.Fatalf("expected insecure=true when SNI missing: %#v", tls)
+	}
+}
+
 func stringsJoinLines(lines ...string) string {
 	return fmt.Sprintf("%s\n", strings.Join(lines, "\n"))
 }

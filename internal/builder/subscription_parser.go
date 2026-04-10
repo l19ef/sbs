@@ -293,10 +293,10 @@ func parseShadowsocksLine(line, defaultTag string) (map[string]any, error) {
 	mainPart, fragment := splitFragment(rest)
 	mainPart, rawQuery := splitQuery(mainPart)
 
-	tag := parseTag(fragment, defaultTag)
-	outbound := map[string]any{
-		"tag":  tag,
-		"type": "shadowsocks",
+	outbound := Outbound{
+		Tag:   parseTag(fragment, defaultTag),
+		Type:  "shadowsocks",
+		Extra: map[string]any{},
 	}
 
 	credentialsPart, serverPart, err := splitShadowsocksParts(mainPart)
@@ -314,20 +314,22 @@ func parseShadowsocksLine(line, defaultTag string) (map[string]any, error) {
 		return nil, err
 	}
 
-	outbound["server"] = host
-	outbound["server_port"] = port
-	outbound["method"] = normalizeShadowsocksMethod(method)
-	outbound["password"] = password
+	outbound.Server = host
+	outbound.ServerPort = port
+	outbound.Extra["method"] = normalizeShadowsocksMethod(method)
+	outbound.Extra["password"] = password
 
 	query, err := url.ParseQuery(rawQuery)
 	if err != nil {
 		return nil, fmt.Errorf("parse ss query: %w", err)
 	}
 	if plugin := query.Get("plugin"); plugin != "" {
-		applyShadowsocksPlugin(outbound, plugin)
+		for key, value := range buildShadowsocksPluginExtra(plugin) {
+			outbound.Extra[key] = value
+		}
 	}
 
-	return outbound, nil
+	return outbound.ToMap(), nil
 }
 
 func splitShadowsocksParts(mainPart string) (string, string, error) {
@@ -392,23 +394,25 @@ func normalizeShadowsocksMethod(method string) string {
 	}
 }
 
-func applyShadowsocksPlugin(outbound map[string]any, plugin string) {
+func buildShadowsocksPluginExtra(plugin string) map[string]any {
+	extra := map[string]any{}
+
 	plugin = strings.TrimSpace(plugin)
 	if plugin == "" {
-		return
+		return extra
 	}
 
 	parts := strings.Split(plugin, ";")
 	if len(parts) == 0 {
-		return
+		return extra
 	}
 
 	name := parts[0]
 	if name == "" {
-		return
+		return extra
 	}
 
-	outbound["plugin"] = name
+	extra["plugin"] = name
 
 	options := make([]string, 0, len(parts)-1)
 	for _, part := range parts[1:] {
@@ -418,8 +422,10 @@ func applyShadowsocksPlugin(outbound map[string]any, plugin string) {
 		options = append(options, part)
 	}
 	if len(options) > 0 {
-		outbound["plugin_opts"] = strings.Join(options, ";") + ";"
+		extra["plugin_opts"] = strings.Join(options, ";") + ";"
 	}
+
+	return extra
 }
 
 func parseTrojanLine(line, defaultTag string) (map[string]any, error) {
@@ -436,20 +442,22 @@ func parseTrojanLine(line, defaultTag string) (map[string]any, error) {
 		return nil, err
 	}
 
-	outbound := map[string]any{
-		"tag":         parseTag(u.Fragment, defaultTag),
-		"type":        "trojan",
-		"server":      host,
-		"server_port": port,
-		"password":    u.User.Username(),
-		"tls": map[string]any{
+	outbound := Outbound{
+		Tag:        parseTag(u.Fragment, defaultTag),
+		Type:       "trojan",
+		Server:     host,
+		ServerPort: port,
+		TLS: map[string]any{
 			"enabled":  true,
 			"insecure": false,
+		},
+		Extra: map[string]any{
+			"password": u.User.Username(),
 		},
 	}
 
 	query := u.Query()
-	tls := outbound["tls"].(map[string]any)
+	tls := outbound.TLS
 	if sni := firstNonEmpty(query.Get("sni"), query.Get("peer")); sni != "" {
 		tls["server_name"] = sni
 	}
@@ -466,8 +474,8 @@ func parseTrojanLine(line, defaultTag string) (map[string]any, error) {
 		}
 	}
 
-	applyTransport(outbound, query)
-	return outbound, nil
+	outbound.Transport = buildTransport(query)
+	return outbound.ToMap(), nil
 }
 
 func parseVLESSLine(line, defaultTag string) (map[string]any, error) {
@@ -485,17 +493,19 @@ func parseVLESSLine(line, defaultTag string) (map[string]any, error) {
 	}
 
 	query := u.Query()
-	outbound := map[string]any{
-		"tag":             parseTag(u.Fragment, defaultTag),
-		"type":            "vless",
-		"server":          host,
-		"server_port":     port,
-		"uuid":            u.User.Username(),
-		"packet_encoding": firstNonEmpty(query.Get("packetEncoding"), "xudp"),
+	outbound := Outbound{
+		Tag:        parseTag(u.Fragment, defaultTag),
+		Type:       "vless",
+		Server:     host,
+		ServerPort: port,
+		Extra: map[string]any{
+			"uuid":            u.User.Username(),
+			"packet_encoding": firstNonEmpty(query.Get("packetEncoding"), "xudp"),
+		},
 	}
 
 	if flow := query.Get("flow"); flow != "" {
-		outbound["flow"] = flow
+		outbound.Extra["flow"] = flow
 	}
 
 	if shouldEnableTLS(query) {
@@ -524,11 +534,11 @@ func parseVLESSLine(line, defaultTag string) (map[string]any, error) {
 			}
 			tls["utls"] = utls
 		}
-		outbound["tls"] = tls
+		outbound.TLS = tls
 	}
 
-	applyTransport(outbound, query)
-	return outbound, nil
+	outbound.Transport = buildTransport(query)
+	return outbound.ToMap(), nil
 }
 
 func parseVMessLine(line, defaultTag string) (map[string]any, error) {
@@ -561,15 +571,17 @@ func parseVMessJSON(payload, defaultTag string) (map[string]any, error) {
 		return nil, fmt.Errorf("invalid vmess port: %w", err)
 	}
 
-	outbound := map[string]any{
-		"tag":             firstNonEmpty(strings.TrimSpace(anyToString(item["ps"])), defaultTag),
-		"type":            "vmess",
-		"server":          anyToString(item["add"]),
-		"server_port":     port,
-		"uuid":            anyToString(item["id"]),
-		"security":        normalizeVMessSecurity(anyToString(item["scy"])),
-		"alter_id":        parseOptionalInt(anyToString(item["aid"])),
-		"packet_encoding": "xudp",
+	outbound := Outbound{
+		Tag:        firstNonEmpty(strings.TrimSpace(anyToString(item["ps"])), defaultTag),
+		Type:       "vmess",
+		Server:     anyToString(item["add"]),
+		ServerPort: port,
+		Extra: map[string]any{
+			"uuid":            anyToString(item["id"]),
+			"security":        normalizeVMessSecurity(anyToString(item["scy"])),
+			"alter_id":        parseOptionalInt(anyToString(item["aid"])),
+			"packet_encoding": "xudp",
+		},
 	}
 
 	netType := anyToString(item["net"])
@@ -585,11 +597,11 @@ func parseVMessJSON(payload, defaultTag string) (map[string]any, error) {
 		if sni := anyToString(item["sni"]); sni != "" {
 			tls["server_name"] = sni
 		}
-		outbound["tls"] = tls
+		outbound.TLS = tls
 	}
 
-	applyVMessTransport(outbound, netType, item)
-	return outbound, nil
+	outbound.Transport = buildVMessTransport(netType, item)
+	return outbound.ToMap(), nil
 }
 
 func normalizeVMessSecurity(value string) string {
@@ -602,7 +614,7 @@ func normalizeVMessSecurity(value string) string {
 	}
 }
 
-func applyVMessTransport(outbound map[string]any, netType string, item map[string]any) {
+func buildVMessTransport(netType string, item map[string]any) map[string]any {
 	switch netType {
 	case "h2", "http", "tcp":
 		transport := map[string]any{"type": "http"}
@@ -612,7 +624,7 @@ func applyVMessTransport(outbound map[string]any, netType string, item map[strin
 		if path := anyToString(item["path"]); path != "" {
 			transport["path"] = strings.Split(path, "?")[0]
 		}
-		outbound["transport"] = transport
+		return transport
 	case "ws":
 		transport := map[string]any{"type": "ws"}
 		if host := anyToString(item["host"]); host != "" {
@@ -626,15 +638,17 @@ func applyVMessTransport(outbound map[string]any, netType string, item map[strin
 				transport["max_early_data"] = earlyData
 			}
 		}
-		outbound["transport"] = transport
+		return transport
 	case "grpc":
-		outbound["transport"] = map[string]any{
+		return map[string]any{
 			"type":         "grpc",
 			"service_name": anyToString(item["path"]),
 		}
 	case "quic":
-		outbound["transport"] = map[string]any{"type": "quic"}
+		return map[string]any{"type": "quic"}
 	}
+
+	return nil
 }
 
 func parseHysteria2Line(line, defaultTag string) (map[string]any, error) {
@@ -653,21 +667,23 @@ func parseHysteria2Line(line, defaultTag string) (map[string]any, error) {
 	}
 
 	query := u.Query()
-	outbound := map[string]any{
-		"tag":         parseTag(u.Fragment, defaultTag),
-		"type":        "hysteria2",
-		"server":      host,
-		"server_port": port,
-		"password":    u.User.Username(),
-		"up_mbps":     parseDefaultInt(query.Get("upmbps"), 10),
-		"down_mbps":   parseDefaultInt(query.Get("downmbps"), 100),
-		"tls": map[string]any{
+	outbound := Outbound{
+		Tag:        parseTag(u.Fragment, defaultTag),
+		Type:       "hysteria2",
+		Server:     host,
+		ServerPort: port,
+		TLS: map[string]any{
 			"enabled":  true,
 			"insecure": false,
 		},
+		Extra: map[string]any{
+			"password":  u.User.Username(),
+			"up_mbps":   parseDefaultInt(query.Get("upmbps"), 10),
+			"down_mbps": parseDefaultInt(query.Get("downmbps"), 100),
+		},
 	}
 
-	tls := outbound["tls"].(map[string]any)
+	tls := outbound.TLS
 	if sni := firstNonEmpty(query.Get("sni"), query.Get("peer")); sni != "" && !strings.EqualFold(sni, "none") {
 		tls["server_name"] = sni
 	} else {
@@ -681,16 +697,16 @@ func parseHysteria2Line(line, defaultTag string) (map[string]any, error) {
 	}
 
 	if obfsType := query.Get("obfs"); obfsType != "" && obfsType != "none" {
-		outbound["obfs"] = map[string]any{
+		outbound.Extra["obfs"] = map[string]any{
 			"type":     obfsType,
 			"password": query.Get("obfs-password"),
 		}
 	}
 
-	return outbound, nil
+	return outbound.ToMap(), nil
 }
 
-func applyTransport(outbound map[string]any, query url.Values) {
+func buildTransport(query url.Values) map[string]any {
 	switch query.Get("type") {
 	case "ws":
 		path, earlyData := splitEarlyDataPath(firstNonEmpty(query.Get("path"), "/"))
@@ -705,9 +721,9 @@ func applyTransport(outbound map[string]any, query url.Values) {
 			transport["early_data_header_name"] = "Sec-WebSocket-Protocol"
 			transport["max_early_data"] = earlyData
 		}
-		outbound["transport"] = transport
+		return transport
 	case "grpc":
-		outbound["transport"] = map[string]any{
+		return map[string]any{
 			"type":         "grpc",
 			"service_name": query.Get("serviceName"),
 		}
@@ -719,8 +735,10 @@ func applyTransport(outbound map[string]any, query url.Values) {
 		if host := firstNonEmpty(query.Get("host"), query.Get("sni")); host != "" {
 			transport["host"] = host
 		}
-		outbound["transport"] = transport
+		return transport
 	}
+
+	return nil
 }
 
 func shouldEnableTLS(query url.Values) bool {
