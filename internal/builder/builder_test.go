@@ -293,7 +293,7 @@ func TestParseSubscriptionContentDecodesBase64Payload(t *testing.T) {
 			"trojan://secret@example.com:443#node-b\n",
 	))
 
-	outbounds, err := parseSubscriptionContent([]byte(content), "remote", BuildOptions{})
+	outbounds, err := parseSubscriptionContent([]byte(content), "remote", BuildOptions{Encoding: "base64"})
 	if err != nil {
 		t.Fatalf("parse subscription content: %v", err)
 	}

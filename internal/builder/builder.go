@@ -88,64 +88,29 @@ func extractRootSubscriptions(root map[string]any) (map[string]subscriptionSourc
 	}
 	delete(root, "subscriptions")
 
-	list, ok := rawSubscriptions.([]any)
-	if !ok {
-		return nil, fmt.Errorf("%q must be an array at the top level", "subscriptions")
+	data, err := json.Marshal(rawSubscriptions)
+	if err != nil {
+		return nil, fmt.Errorf("marshal subscriptions: %w", err)
 	}
 
-	subscriptionByTag := make(map[string]subscriptionSource, len(list))
-	for _, entry := range list {
-		item, ok := entry.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("%q must contain only objects at the top level", "subscriptions")
-		}
+	var items []subscriptionSource
+	if err := json.Unmarshal(data, &items); err != nil {
+		return nil, fmt.Errorf("unmarshal subscriptions: %w", err)
+	}
 
-		tag, _ := item["tag"].(string)
-		if tag == "" {
+	subscriptionByTag := make(map[string]subscriptionSource, len(items))
+	for _, item := range items {
+		if item.Tag == "" {
 			return nil, fmt.Errorf("subscription tag cannot be empty")
 		}
-
-		url, _ := item["url"].(string)
-		if url == "" {
-			return nil, fmt.Errorf("subscription %q must define url", tag)
+		if item.URL == "" {
+			return nil, fmt.Errorf("subscription %q must define url", item.Tag)
 		}
-
-		if _, exists := subscriptionByTag[tag]; exists {
-			return nil, fmt.Errorf("duplicate subscription tag %q", tag)
+		if _, exists := subscriptionByTag[item.Tag]; exists {
+			return nil, fmt.Errorf("duplicate subscription tag %q", item.Tag)
 		}
-
-		subscriptionByTag[tag] = subscriptionSource{
-			Tag:              tag,
-			URL:              url,
-			Emojify:          toBool(item["emojify"]),
-			Exclude:          toStringArray(item["exclude"]),
-			ExcludeProtocols: toStringArray(item["exclude_protocols"]),
-		}
+		subscriptionByTag[item.Tag] = item
 	}
 
 	return subscriptionByTag, nil
-}
-
-func toBool(v any) bool {
-	if b, ok := v.(bool); ok {
-		return b
-	}
-	return false
-}
-
-func toStringArray(v any) []string {
-	if v == nil {
-		return nil
-	}
-	list, ok := v.([]any)
-	if !ok {
-		return nil
-	}
-	result := make([]string, 0, len(list))
-	for _, item := range list {
-		if s, ok := item.(string); ok {
-			result = append(result, s)
-		}
-	}
-	return result
 }

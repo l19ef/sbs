@@ -6,6 +6,7 @@ type subscriptionSource struct {
 	Emojify          bool     `json:"emojify"`
 	Exclude          []string `json:"exclude"`
 	ExcludeProtocols []string `json:"exclude_protocols"`
+	Encoding         string   `json:"encoding"`
 }
 
 type outboundContainer struct {
@@ -16,4 +17,5 @@ type BuildOptions struct {
 	Emojify          bool
 	ExcludePatterns  []string
 	ExcludeProtocols []string
+	Encoding         string
 }

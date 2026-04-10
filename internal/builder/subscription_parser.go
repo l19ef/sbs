@@ -14,7 +14,7 @@ import (
 
 var countryPrefixPattern = regexp.MustCompile(`^([A-Z]{2})(?:$|[^A-Za-z])`)
 
-func decodeBase64IfNeeded(data []byte) []byte {
+func decodeBase64(data []byte) []byte {
 	if decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(data))); err == nil {
 		return decoded
 	}
@@ -22,7 +22,12 @@ func decodeBase64IfNeeded(data []byte) []byte {
 }
 
 func parseSubscriptionContent(data []byte, tagPrefix string, options BuildOptions) ([]map[string]any, error) {
-	text := normalizeSubscriptionText(string(decodeBase64IfNeeded(data)))
+	var text string
+	if options.Encoding == "base64" {
+		text = normalizeSubscriptionText(string(decodeBase64(data)))
+	} else {
+		text = normalizeSubscriptionText(string(data))
+	}
 	if text == "" {
 		return nil, fmt.Errorf("subscription is empty")
 	}
@@ -186,28 +191,6 @@ func normalizeSubscriptionText(text string) string {
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 	text = strings.ReplaceAll(text, "\r", "\n")
 	return strings.TrimSpace(text)
-}
-
-func parseSubscriptionLines(text, tagPrefix string) ([]map[string]any, error) {
-	lines := strings.Split(text, "\n")
-	outbounds := make([]map[string]any, 0, len(lines))
-
-	for index, rawLine := range lines {
-		line := strings.TrimSpace(rawLine)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		outbound, recognized, err := parseSubscriptionLine(line, tagPrefix, index)
-		if err != nil {
-			return nil, fmt.Errorf("parse subscription line %d: %w", index+1, err)
-		}
-		if recognized {
-			outbounds = append(outbounds, outbound)
-		}
-	}
-
-	return outbounds, nil
 }
 
 func parseSubscriptionLine(line, tagPrefix string, index int) (map[string]any, bool, error) {
@@ -578,20 +561,6 @@ func applyVMessTransport(outbound map[string]any, netType string, item map[strin
 		}
 	case "quic":
 		outbound["transport"] = map[string]any{"type": "quic"}
-	}
-}
-
-func applyVMessQueryTransport(outbound map[string]any, query url.Values) {
-	switch {
-	case query.Get("obfs") == "websocket" || query.Get("type") == "ws":
-		transport := map[string]any{
-			"type": "ws",
-			"path": splitEarlyDataOnlyPath(query.Get("path")),
-			"headers": map[string]any{
-				"Host": query.Get("host"),
-			},
-		}
-		outbound["transport"] = transport
 	}
 }
 

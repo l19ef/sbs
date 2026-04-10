@@ -34,12 +34,14 @@ func (r *subscriptionResolver) resolve(tag string) ([]map[string]any, error) {
 		Emojify:          source.Emojify,
 		ExcludePatterns:  source.Exclude,
 		ExcludeProtocols: source.ExcludeProtocols,
+		Encoding:         source.Encoding,
 	}
 
 	items, err := parseSubscriptionContent(data, tag, options)
 	if err != nil {
 		return nil, fmt.Errorf("parse subscription %q: %w", tag, err)
 	}
+
 	for _, outbound := range items {
 		if _, ok := outbound["tag"].(string); !ok {
 			return nil, fmt.Errorf("subscription %q contains outbound without string tag", tag)

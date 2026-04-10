@@ -19,6 +19,8 @@ sbs generate template.json
 sbs generate template.json --out output.json
 ```
 
+When `--out` is set, output is written to the target file atomically.
+
 ### serve
 
 Start config server:
@@ -43,6 +45,14 @@ sbs serve config.json --port 443 --tls-cert cert.pem --tls-key key.pem
   ]
 }
 ```
+
+Validation rules for effective serve config (JSON + CLI flags):
+
+- `tls_cert` and `tls_key` are required in the final merged config
+- `port` must be in range `0..65535` (`0` means random free port)
+- at least one template is required
+- each template must define non-empty `path` and `token`
+- template tokens must be unique
 
 ## Template format
 
