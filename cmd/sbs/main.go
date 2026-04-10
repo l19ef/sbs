@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -166,7 +167,7 @@ func runServer(cfg *HostConfig, displayHostname string) error {
 	})
 
 	var ln net.Listener
-	var displayPort string
+	var listenPort int
 	var err error
 
 	if cfg.Port != 0 {
@@ -174,7 +175,7 @@ func runServer(cfg *HostConfig, displayHostname string) error {
 		if err != nil {
 			return fmt.Errorf("listen: %w", err)
 		}
-		displayPort = fmt.Sprintf(":%d", cfg.Port)
+		listenPort = cfg.Port
 	} else {
 		ln, err = net.Listen("tcp", ":0")
 		if err != nil {
@@ -185,11 +186,21 @@ func runServer(cfg *HostConfig, displayHostname string) error {
 			ln.Close()
 			return fmt.Errorf("parse addr: %w", err)
 		}
-		displayPort = ":" + portStr
+		p, err := strconv.Atoi(portStr)
+		if err != nil {
+			ln.Close()
+			return fmt.Errorf("parse port: %w", err)
+		}
+		listenPort = p
 	}
+
 	displayHost := displayHostname
-	if displayHost == "" {
-		displayHost = displayPort
+	if displayHostname != "" {
+		if listenPort != 443 {
+			displayHost = fmt.Sprintf("%s:%d", displayHostname, listenPort)
+		}
+	} else {
+		displayHost = fmt.Sprintf(":%d", listenPort)
 	}
 	fmt.Printf("Config server running on https://%s\n", displayHost)
 	fmt.Println("URLs:")
