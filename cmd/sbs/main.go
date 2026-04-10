@@ -195,12 +195,10 @@ func runServer(cfg *HostConfig, displayHostname string) error {
 	}
 
 	displayHost := displayHostname
-	if displayHostname != "" {
-		if listenPort != 443 {
-			displayHost = fmt.Sprintf("%s:%d", displayHostname, listenPort)
-		}
-	} else {
-		displayHost = fmt.Sprintf(":%d", listenPort)
+	if displayHostname == "" {
+		displayHost = fmt.Sprintf("127.0.0.1:%d", listenPort)
+	} else if listenPort != 443 {
+		displayHost = fmt.Sprintf("%s:%d", displayHostname, listenPort)
 	}
 	fmt.Printf("Config server running on https://%s\n", displayHost)
 	fmt.Println("URLs:")
