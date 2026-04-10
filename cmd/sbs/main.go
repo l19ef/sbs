@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -97,8 +99,13 @@ func loadHostConfig(path string) (*HostConfig, error) {
 	}
 
 	var cfg HostConfig
-	if err := json.Unmarshal(data, &cfg); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
+	}
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		return nil, fmt.Errorf("parse config: unexpected trailing content")
 	}
 
 	return &cfg, nil
@@ -227,9 +234,11 @@ func validateHostConfig(cfg *HostConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("host config is nil")
 	}
+	cfg.TLSCert = strings.TrimSpace(cfg.TLSCert)
 	if cfg.TLSCert == "" {
 		return fmt.Errorf("tls_cert is required")
 	}
+	cfg.TLSKey = strings.TrimSpace(cfg.TLSKey)
 	if cfg.TLSKey == "" {
 		return fmt.Errorf("tls_key is required")
 	}
@@ -241,7 +250,11 @@ func validateHostConfig(cfg *HostConfig) error {
 	}
 
 	seenTokens := make(map[string]struct{}, len(cfg.Templates))
-	for _, tmpl := range cfg.Templates {
+	for i := range cfg.Templates {
+		tmpl := &cfg.Templates[i]
+		tmpl.Path = strings.TrimSpace(tmpl.Path)
+		tmpl.Token = strings.TrimSpace(tmpl.Token)
+
 		if tmpl.Path == "" {
 			return fmt.Errorf("template path is required")
 		}

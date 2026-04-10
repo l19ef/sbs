@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -13,21 +14,49 @@ import (
 )
 
 var countryPrefixPattern = regexp.MustCompile(`^([A-Z]{2})(?:$|[^A-Za-z])`)
+var errNoValidSubscriptionNodes = errors.New("no valid subscription nodes found")
 
-func decodeBase64(data []byte) []byte {
-	if decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(data))); err == nil {
-		return decoded
-	}
-	return data
+func decodeBase64(data []byte) ([]byte, error) {
+	return decodeBase64String(string(data))
 }
 
 func parseSubscriptionContent(data []byte, tagPrefix string, options BuildOptions) ([]map[string]any, error) {
-	var text string
-	if options.Encoding == "base64" {
-		text = normalizeSubscriptionText(string(decodeBase64(data)))
-	} else {
-		text = normalizeSubscriptionText(string(data))
+	encoding := strings.ToLower(strings.TrimSpace(options.Encoding))
+	if encoding == "" {
+		encoding = "auto"
 	}
+
+	plainText := normalizeSubscriptionText(string(data))
+
+	switch encoding {
+	case "plain":
+		return parseSubscriptionText(plainText, tagPrefix, options)
+	case "base64":
+		decoded, err := decodeBase64(data)
+		if err != nil {
+			return nil, fmt.Errorf("decode base64 subscription: %w", err)
+		}
+		return parseSubscriptionText(normalizeSubscriptionText(string(decoded)), tagPrefix, options)
+	case "auto":
+		outbounds, err := parseSubscriptionText(plainText, tagPrefix, options)
+		if err == nil {
+			return outbounds, nil
+		}
+		if !errors.Is(err, errNoValidSubscriptionNodes) {
+			return nil, err
+		}
+
+		decoded, decodeErr := decodeBase64(data)
+		if decodeErr != nil {
+			return nil, err
+		}
+		return parseSubscriptionText(normalizeSubscriptionText(string(decoded)), tagPrefix, options)
+	default:
+		return nil, fmt.Errorf("unsupported encoding %q (expected auto, plain, or base64)", options.Encoding)
+	}
+}
+
+func parseSubscriptionText(text, tagPrefix string, options BuildOptions) ([]map[string]any, error) {
 	if text == "" {
 		return nil, fmt.Errorf("subscription is empty")
 	}
@@ -51,7 +80,7 @@ func parseSubscriptionContent(data []byte, tagPrefix string, options BuildOption
 	}
 
 	if len(outbounds) == 0 {
-		return nil, fmt.Errorf("no valid subscription nodes found")
+		return nil, errNoValidSubscriptionNodes
 	}
 
 	return postProcessOutbounds(outbounds, options), nil
@@ -270,21 +299,14 @@ func parseShadowsocksLine(line, defaultTag string) (map[string]any, error) {
 		"type": "shadowsocks",
 	}
 
-	at := strings.LastIndex(mainPart, "@")
-	if at < 0 {
-		return nil, fmt.Errorf("invalid ss url: missing @ separator")
-	}
-	credentialsPart := mainPart[:at]
-	serverPart := mainPart[at+1:]
-
-	decoded, err := decodeBase64String(credentialsPart)
+	credentialsPart, serverPart, err := splitShadowsocksParts(mainPart)
 	if err != nil {
-		return nil, fmt.Errorf("decode ss credentials: %w", err)
+		return nil, err
 	}
 
-	method, password, ok := strings.Cut(string(decoded), ":")
-	if !ok {
-		return nil, fmt.Errorf("invalid ss credentials")
+	method, password, err := parseShadowsocksCredentials(credentialsPart)
+	if err != nil {
+		return nil, err
 	}
 
 	host, port, err := splitHostPort(serverPart)
@@ -306,6 +328,57 @@ func parseShadowsocksLine(line, defaultTag string) (map[string]any, error) {
 	}
 
 	return outbound, nil
+}
+
+func splitShadowsocksParts(mainPart string) (string, string, error) {
+	at := strings.LastIndex(mainPart, "@")
+	if at >= 0 {
+		credentialsPart := mainPart[:at]
+		serverPart := mainPart[at+1:]
+		if credentialsPart == "" || serverPart == "" {
+			return "", "", fmt.Errorf("invalid ss url")
+		}
+		return credentialsPart, serverPart, nil
+	}
+
+	decoded, err := decodeBase64String(mainPart)
+	if err != nil {
+		return "", "", fmt.Errorf("invalid ss url: missing @ separator")
+	}
+	decodedMain := strings.TrimSpace(string(decoded))
+	decodedAt := strings.LastIndex(decodedMain, "@")
+	if decodedAt < 0 {
+		return "", "", fmt.Errorf("invalid ss url: missing @ separator")
+	}
+
+	credentialsPart := decodedMain[:decodedAt]
+	serverPart := decodedMain[decodedAt+1:]
+	if credentialsPart == "" || serverPart == "" {
+		return "", "", fmt.Errorf("invalid ss url")
+	}
+	return credentialsPart, serverPart, nil
+}
+
+func parseShadowsocksCredentials(credentialsPart string) (string, string, error) {
+	if decoded, err := decodeBase64String(credentialsPart); err == nil {
+		if method, password, ok := strings.Cut(string(decoded), ":"); ok {
+			return method, password, nil
+		}
+	}
+
+	decodedUserInfo, err := url.QueryUnescape(credentialsPart)
+	if err != nil {
+		return "", "", fmt.Errorf("decode ss credentials: %w", err)
+	}
+
+	method, password, ok := strings.Cut(decodedUserInfo, ":")
+	if !ok {
+		return "", "", fmt.Errorf("invalid ss credentials")
+	}
+	if method == "" {
+		return "", "", fmt.Errorf("invalid ss credentials")
+	}
+	return method, password, nil
 }
 
 func normalizeShadowsocksMethod(method string) string {

@@ -82,6 +82,7 @@ Validation rules for effective serve config (JSON + CLI flags):
 | `emojify` | bool | Add country flag emojis to tags |
 | `exclude` | string[] | Substrings to exclude by tag |
 | `exclude_protocols` | string[] | Protocol types to exclude |
+| `encoding` | string | `auto` (default), `plain`, or `base64` |
 
 #### Emoji tags
 

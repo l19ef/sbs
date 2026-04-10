@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -88,6 +89,55 @@ func TestGenerateWritesToStdoutWhenOutputPathIsEmpty(t *testing.T) {
 	}
 	if buf.Len() == 0 {
 		t.Fatalf("stdout output is empty")
+	}
+}
+
+func TestLoadHostConfigRejectsUnknownFields(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "host.json")
+	content := []byte(`{
+  "tls_cert": "cert.pem",
+  "tls_key": "key.pem",
+  "templates": [{"path": "template.json", "token": "t1"}],
+  "unknown": true
+}`)
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		t.Fatalf("write host config: %v", err)
+	}
+
+	_, err := loadHostConfig(path)
+	if err == nil {
+		t.Fatalf("expected error for unknown field")
+	}
+	if !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("expected unknown field error, got: %v", err)
+	}
+}
+
+func TestWriteAtomicallyFailsWhenParentDirectoryMissing(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "missing", "out.json")
+	err := writeAtomically(path, []byte("{}"))
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+}
+
+func TestValidateHostConfigTrimsWhitespaceValues(t *testing.T) {
+	cfg := &HostConfig{
+		TLSCert: "  cert.pem  ",
+		TLSKey:  "\tkey.pem\n",
+		Templates: []TemplateConfig{
+			{Path: "  template.json  ", Token: " token-a "},
+		},
+	}
+
+	if err := validateHostConfig(cfg); err != nil {
+		t.Fatalf("validateHostConfig: %v", err)
+	}
+	if cfg.TLSCert != "cert.pem" || cfg.TLSKey != "key.pem" {
+		t.Fatalf("tls fields were not normalized: %#v", cfg)
+	}
+	if cfg.Templates[0].Path != "template.json" || cfg.Templates[0].Token != "token-a" {
+		t.Fatalf("template fields were not normalized: %#v", cfg.Templates[0])
 	}
 }
 

@@ -357,6 +357,56 @@ func TestParseSubscriptionContentUniquifiesDuplicateTags(t *testing.T) {
 	}
 }
 
+func TestParseSubscriptionContentAutoDecodesBase64Payload(t *testing.T) {
+	content := base64.StdEncoding.EncodeToString([]byte(
+		"vmess://eyJhZGQiOiJ2bWVzcy5leGFtcGxlLmNvbSIsImFpZCI6IjAiLCJob3N0IjoiY2RuLmV4YW1wbGUuY29tIiwiaWQiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTExIiwibmV0Ijoid3MiLCJwYXRoIjoiL3dzIiwicG9ydCI6IjQ0MyIsInBzIjoibm9kZS1hIiwic2N5IjoiYXV0byIsInNuaSI6InZtZXNzLmV4YW1wbGUuY29tIiwidGxzIjoidGxzIn0=\n" +
+			"trojan://secret@example.com:443#node-b\n",
+	))
+
+	outbounds, err := parseSubscriptionContent([]byte(content), "remote", BuildOptions{})
+	if err != nil {
+		t.Fatalf("parse subscription content: %v", err)
+	}
+
+	if len(outbounds) != 2 {
+		t.Fatalf("unexpected outbound count: got %d want 2", len(outbounds))
+	}
+	if outbounds[0]["type"] != "vmess" || outbounds[1]["type"] != "trojan" {
+		t.Fatalf("unexpected outbound types: %#v", outbounds)
+	}
+}
+
+func TestParseSubscriptionContentRejectsInvalidEncodingOption(t *testing.T) {
+	_, err := parseSubscriptionContent([]byte("trojan://secret@example.com:443#n1\n"), "remote", BuildOptions{Encoding: "gzip"})
+	if err == nil {
+		t.Fatalf("expected unsupported encoding error")
+	}
+}
+
+func TestParseShadowsocksLineSupportsSIP002Formats(t *testing.T) {
+	tests := []string{
+		"ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpwYXNz@server.example.com:9000#NodeA",
+		"ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpwYXNzQHNlcnZlci5leGFtcGxlLmNvbTo5MDAw#NodeB",
+		"ss://chacha20-ietf-poly1305:pass@server.example.com:9000#NodeC",
+	}
+
+	for _, line := range tests {
+		outbound, err := parseShadowsocksLine(line, "fallback")
+		if err != nil {
+			t.Fatalf("parseShadowsocksLine(%q): %v", line, err)
+		}
+		if outbound["type"] != "shadowsocks" {
+			t.Fatalf("unexpected type for %q: %#v", line, outbound)
+		}
+		if outbound["server"] != "server.example.com" || outbound["server_port"] != 9000 {
+			t.Fatalf("unexpected server for %q: %#v", line, outbound)
+		}
+		if outbound["method"] != "chacha20-ietf-poly1305" || outbound["password"] != "pass" {
+			t.Fatalf("unexpected auth fields for %q: %#v", line, outbound)
+		}
+	}
+}
+
 func stringsJoinLines(lines ...string) string {
 	return fmt.Sprintf("%s\n", strings.Join(lines, "\n"))
 }
