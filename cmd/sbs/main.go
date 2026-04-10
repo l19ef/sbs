@@ -37,9 +37,10 @@ type TemplateConfig struct {
 
 func main() {
 	var (
-		port    int
-		tlsCert string
-		tlsKey  string
+		port     int
+		tlsCert  string
+		tlsKey   string
+		hostname string
 	)
 
 	serveCmd := &cobra.Command{
@@ -66,13 +67,14 @@ func main() {
 				return err
 			}
 
-			return runServer(cfg)
+			return runServer(cfg, hostname)
 		},
 	}
 
 	serveCmd.Flags().IntVarP(&port, "port", "p", 0, "Port to listen on")
 	serveCmd.Flags().StringVar(&tlsCert, "tls-cert", "", "TLS certificate path")
 	serveCmd.Flags().StringVar(&tlsKey, "tls-key", "", "TLS private key path")
+	serveCmd.Flags().StringVar(&hostname, "hostname", "", "Hostname to display in printed URLs")
 
 	var outputPath string
 
@@ -117,7 +119,7 @@ func loadHostConfig(path string) (*HostConfig, error) {
 	return &cfg, nil
 }
 
-func runServer(cfg *HostConfig) error {
+func runServer(cfg *HostConfig, displayHostname string) error {
 	if err := validateHostConfig(cfg); err != nil {
 		return err
 	}
@@ -185,10 +187,14 @@ func runServer(cfg *HostConfig) error {
 		}
 		displayPort = ":" + portStr
 	}
-	fmt.Printf("Config server running on https://%s\n", displayPort)
+	displayHost := displayHostname
+	if displayHost == "" {
+		displayHost = displayPort
+	}
+	fmt.Printf("Config server running on https://%s\n", displayHost)
 	fmt.Println("URLs:")
 	for _, tmpl := range cfg.Templates {
-		fmt.Printf("  https://%s/config?token=%s\n", displayPort, tmpl.Token)
+		fmt.Printf("  https://%s/config?token=%s\n", displayHost, tmpl.Token)
 	}
 
 	server := &http.Server{Handler: mux}
