@@ -177,8 +177,6 @@ func parseClashProxy(proxy clashProxy, fallback string) (Outbound, bool, error) 
 			Server:     proxy.Server,
 			ServerPort: proxy.Port,
 			Password:   proxy.Password,
-			UpMbps:     intPtr(10),
-			DownMbps:   intPtr(100),
 			TLS: map[string]any{
 				"enabled":  true,
 				"insecure": false,

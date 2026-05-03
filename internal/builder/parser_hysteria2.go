@@ -22,18 +22,27 @@ func parseHysteria2Line(line, defaultTag string) (Outbound, error) {
 	}
 
 	query := u.Query()
+	upmbps := query.Get("upmbps")
+	downmbps := query.Get("downmbps")
+
 	outbound := Outbound{
 		Tag:        parseTag(u.Fragment, defaultTag),
 		Type:       "hysteria2",
 		Server:     host,
 		ServerPort: port,
 		Password:   u.User.Username(),
-		UpMbps:     intPtr(parseDefaultInt(query.Get("upmbps"), 10)),
-		DownMbps:   intPtr(parseDefaultInt(query.Get("downmbps"), 100)),
-		TLS: map[string]any{
-			"enabled":  true,
-			"insecure": false,
-		},
+	}
+
+	if upmbps != "" {
+		outbound.UpMbps = intPtr(parseDefaultInt(upmbps, 0))
+	}
+	if downmbps != "" {
+		outbound.DownMbps = intPtr(parseDefaultInt(downmbps, 0))
+	}
+
+	outbound.TLS = map[string]any{
+		"enabled":  true,
+		"insecure": false,
 	}
 
 	tls := outbound.TLS
