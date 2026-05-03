@@ -198,13 +198,15 @@ func runServer(cfg *HostConfig, hostname string) error {
 	if host == "" {
 		host = "127.0.0.1"
 	}
+	suffix := ""
 	if listenPort != 443 {
-		host = fmt.Sprintf("%s:%d", host, listenPort)
+		suffix = fmt.Sprintf(":%d", listenPort)
 	}
-	fmt.Printf("Config server running on https://%s\n", host)
+	urlHost := host + suffix
+	fmt.Printf("Config server running on https://%s\n", urlHost)
 	fmt.Println("URLs:")
 	for _, tmpl := range cfg.Templates {
-		fmt.Printf("  https://%s/config?token=%s\n", host, tmpl.Token)
+		fmt.Printf("  https://%s/config?token=%s\n", urlHost, tmpl.Token)
 	}
 
 	server := &http.Server{Handler: mux}
