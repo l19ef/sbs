@@ -150,6 +150,12 @@ func parseSubscriptionLine(line, tagPrefix string, index int) (Outbound, bool, e
 			return Outbound{}, true, fmt.Errorf("hysteria2: %w", err)
 		}
 		return outbound, true, nil
+	case strings.HasPrefix(line, "http2://"):
+		outbound, err := parseNaiveLine(line, fallbackTag(tagPrefix, "naive", index))
+		if err != nil {
+			return Outbound{}, true, fmt.Errorf("naive: %w", err)
+		}
+		return outbound, true, nil
 	default:
 		return Outbound{}, false, nil
 	}

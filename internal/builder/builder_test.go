@@ -330,6 +330,7 @@ func TestParseSubscriptionContentParsesSupportedProtocols(t *testing.T) {
 		"vless://11111111-1111-1111-1111-111111111111@example.com:443/ws?type=ws&security=tls&sni=example.com&host=cdn.example.com&path=%2Fws#Node%20VLESS",
 		"vmess://eyJhZGQiOiJ2bWVzcy5leGFtcGxlLmNvbSIsImFpZCI6IjAiLCJob3N0IjoiY2RuLmV4YW1wbGUuY29tIiwiaWQiOiIyMjIyMjIyMi0yMjIyLTIyMjItMjIyMi0yMjIyMjIyMjIyMjIiLCJuZXQiOiJ3cyIsInBhdGgiOiIvd2MiLCJwb3J0IjoiNDQzIiwicHMiOiJOb2RlIFZNZXNzIiwic2N5IjoiYXV0byIsInNuaSI6InZtZXNzLmV4YW1wbGUuY29tIiwidGxzIjoidGxzIn0=",
 		"hysteria2://password@example.com:443?sni=example.com#Node%20HY2",
+		"http2://dGVzdHVzZXI6dGVzdHBhc3NAdGVzdC5leGFtcGxlLmNvbToxMjM0NQ==?padding=1&tfo=0#%F0%9F%87%B1%F0%9F%87%B9%20test%20node%20(Naive)",
 	)
 
 	outbounds, err := parseSubscriptionContent([]byte(content), "remote", BuildOptions{})
@@ -337,8 +338,8 @@ func TestParseSubscriptionContentParsesSupportedProtocols(t *testing.T) {
 		t.Fatalf("parse subscription content: %v", err)
 	}
 
-	if len(outbounds) != 5 {
-		t.Fatalf("unexpected outbound count: got %d want 5", len(outbounds))
+	if len(outbounds) != 6 {
+		t.Fatalf("unexpected outbound count: got %d want 6", len(outbounds))
 	}
 
 	if got := outbounds[0].Type; got != "shadowsocks" {
@@ -355,6 +356,26 @@ func TestParseSubscriptionContentParsesSupportedProtocols(t *testing.T) {
 	}
 	if got := outbounds[4].Type; got != "hysteria2" {
 		t.Fatalf("unexpected hysteria2 type: %#v", got)
+	}
+	if got := outbounds[5].Type; got != "naive" {
+		t.Fatalf("unexpected naive type: %#v", got)
+	}
+
+	naive := outbounds[5]
+	if naive.Username != "testuser" {
+		t.Fatalf("unexpected naive username: %#v", naive.Username)
+	}
+	if naive.Password != "testpass" {
+		t.Fatalf("unexpected naive password: %#v", naive.Password)
+	}
+	if naive.Server != "test.example.com" {
+		t.Fatalf("unexpected naive server: %#v", naive.Server)
+	}
+	if naive.ServerPort != 12345 {
+		t.Fatalf("unexpected naive server_port: %#v", naive.ServerPort)
+	}
+	if naive.Tag != "🇱🇹 test node (Naive)" {
+		t.Fatalf("unexpected naive tag: %#v", naive.Tag)
 	}
 }
 

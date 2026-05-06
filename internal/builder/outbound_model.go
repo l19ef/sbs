@@ -11,6 +11,7 @@ type Outbound struct {
 	Transport  map[string]any `json:"transport,omitempty"`
 
 	UUID           string         `json:"uuid,omitempty"`
+	Username       string         `json:"username,omitempty"`
 	Password       string         `json:"password,omitempty"`
 	Method         string         `json:"method,omitempty"`
 	Plugin         string         `json:"plugin,omitempty"`
