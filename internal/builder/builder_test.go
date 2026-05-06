@@ -221,6 +221,96 @@ func TestBuildExpandsMultipleSubscriptions(t *testing.T) {
 	}
 }
 
+func TestBuildExpandsLink(t *testing.T) {
+	template := []byte(`{
+  "outbounds": [
+    { "link": "hysteria2://password@example.com:443?sni=example.com#Node%20HY2" },
+    { "link": "trojan://secret@example.com:443#Node%20Trojan" },
+    { "tag": "direct", "type": "direct" }
+  ]
+}`)
+
+	result, err := Build(template, t.TempDir(), stubLoader{})
+	if err != nil {
+		t.Fatalf("build config: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(result, &decoded); err != nil {
+		t.Fatalf("decode result: %v", err)
+	}
+
+	outbounds := decoded["outbounds"].([]any)
+	if len(outbounds) != 3 {
+		t.Fatalf("unexpected outbound count: got %d want 3", len(outbounds))
+	}
+
+	hy2 := outbounds[0].(map[string]any)
+	if hy2["type"] != "hysteria2" || hy2["tag"] != "Node HY2" {
+		t.Fatalf("unexpected hysteria2 outbound: %#v", hy2)
+	}
+	if hy2["server"] != "example.com" || hy2["server_port"].(float64) != 443 {
+		t.Fatalf("unexpected server fields: %#v", hy2)
+	}
+
+	trojan := outbounds[1].(map[string]any)
+	if trojan["type"] != "trojan" || trojan["tag"] != "Node Trojan" {
+		t.Fatalf("unexpected trojan outbound: %#v", trojan)
+	}
+
+	direct := outbounds[2].(map[string]any)
+	if direct["tag"] != "direct" || direct["type"] != "direct" {
+		t.Fatalf("unexpected direct outbound: %#v", direct)
+	}
+}
+
+func TestBuildExpandsLinkWithAllProtocols(t *testing.T) {
+	template := []byte(`{
+  "outbounds": [
+    { "link": "ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpwYXNz@server.example.com:9000#Node%20SS" },
+    { "link": "vless://11111111-1111-1111-1111-111111111111@example.com:443#Node%20VLESS" },
+    { "link": "vmess://eyJhZGQiOiJ2bWVzcy5leGFtcGxlLmNvbSIsImFpZCI6IjAiLCJob3N0IjoiY2RuLmV4YW1wbGUuY29tIiwiaWQiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTExIiwibmV0Ijoid3MiLCJwYXRoIjoiL3dzIiwicG9ydCI6IjQ0MyIsInBzIjoibm9kZS1hIiwic2N5IjoiYXV0byIsInNuaSI6InZtZXNzLmV4YW1wbGUuY29tIiwidGxzIjoidGxzIn0=" },
+    { "link": "hy2://password@example.com:443?sni=example.com#Node%20HY2" }
+  ]
+}`)
+
+	result, err := Build(template, t.TempDir(), stubLoader{})
+	if err != nil {
+		t.Fatalf("build config: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(result, &decoded); err != nil {
+		t.Fatalf("decode result: %v", err)
+	}
+
+	outbounds := decoded["outbounds"].([]any)
+	if len(outbounds) != 4 {
+		t.Fatalf("unexpected outbound count: got %d want 4", len(outbounds))
+	}
+
+	protocols := []string{"shadowsocks", "vless", "vmess", "hysteria2"}
+	for i, protocol := range protocols {
+		outbound := outbounds[i].(map[string]any)
+		if outbound["type"] != protocol {
+			t.Fatalf("outbound[%d] type: got %q want %q", i, outbound["type"], protocol)
+		}
+	}
+}
+
+func TestBuildRejectsInvalidLink(t *testing.T) {
+	template := []byte(`{
+  "outbounds": [
+    { "link": "invalid://something" }
+  ]
+}`)
+
+	_, err := Build(template, t.TempDir(), stubLoader{})
+	if err == nil {
+		t.Fatalf("expected error for invalid link")
+	}
+}
+
 type stubLoader struct {
 	payloads map[string]string
 }

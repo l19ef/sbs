@@ -109,3 +109,20 @@ func cloneValue(value any) any {
 		return typed
 	}
 }
+
+func outboundToMap(outbound Outbound) map[string]any {
+	data, err := json.Marshal(outbound)
+	if err != nil {
+		panic(err)
+	}
+	var result map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		panic(err)
+	}
+	for k, v := range result {
+		if v == nil {
+			delete(result, k)
+		}
+	}
+	return result
+}

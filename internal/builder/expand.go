@@ -3,7 +3,79 @@ package builder
 import (
 	"fmt"
 	"slices"
+	"strings"
 )
+
+var linkProtocols = []string{
+	"ss://",
+	"trojan://",
+	"vless://",
+	"vmess://",
+	"hysteria2://",
+	"hy2://",
+}
+
+func isLink(s string) bool {
+	s = strings.ToLower(s)
+	for _, p := range linkProtocols {
+		if strings.HasPrefix(s, p) {
+			return true
+		}
+	}
+	return false
+}
+
+func parseLink(link string, defaultTag string) (map[string]any, error) {
+	outbound, recognized, err := parseSubscriptionLine(link, defaultTag, 0)
+	if err != nil {
+		return nil, err
+	}
+	if !recognized {
+		return nil, fmt.Errorf("unrecognized link protocol: %s", link)
+	}
+	return outboundToMap(outbound), nil
+}
+
+func expandLink(node map[string]any) (map[string]any, error) {
+	link, ok := node["link"].(string)
+	if !ok || link == "" {
+		return nil, fmt.Errorf("link field must be a non-empty string")
+	}
+
+	outbound, err := parseLink(link, "link")
+	if err != nil {
+		return nil, fmt.Errorf("parse link: %w", err)
+	}
+
+	return outbound, nil
+}
+
+func expandLinks(outbounds []map[string]any) error {
+	result := make([]map[string]any, 0, len(outbounds))
+
+	for _, outbound := range outbounds {
+		if link, hasLink := outbound["link"]; hasLink {
+			linkStr, isString := link.(string)
+			if !isString || linkStr == "" {
+				return fmt.Errorf("link field must be a non-empty string")
+			}
+
+			expanded, err := expandLink(outbound)
+			if err != nil {
+				return err
+			}
+			result = append(result, expanded)
+		} else {
+			result = append(result, outbound)
+		}
+	}
+
+	for i := range outbounds {
+		outbounds[i] = result[i]
+	}
+
+	return nil
+}
 
 func expandSubscriptions(node any, resolver *subscriptionResolver) error {
 	switch typed := node.(type) {

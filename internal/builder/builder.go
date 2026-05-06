@@ -41,6 +41,10 @@ func BuildWithOptions(templateData []byte, baseDir string, loader SubscriptionCo
 		return nil, err
 	}
 
+	if err := expandLinks(rootOutbounds); err != nil {
+		return nil, err
+	}
+
 	resolver := &subscriptionResolver{
 		byTag:  subscriptionByTag,
 		cache:  map[string][]Outbound{},
