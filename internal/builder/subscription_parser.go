@@ -3,6 +3,7 @@ package builder
 import (
 	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 )
@@ -100,11 +101,14 @@ func parseSubscriptionText(text, tagPrefix string, options BuildOptions) ([]Outb
 
 		outbound, recognized, err := parseSubscriptionLine(line, tagPrefix, index)
 		if err != nil {
-			return nil, fmt.Errorf("parse subscription line %d: %w", index+1, err)
+			log.Printf("[%s] line %d: parse error: %v", tagPrefix, index+1, err)
+			continue
 		}
-		if recognized {
-			outbounds = append(outbounds, outbound)
+		if !recognized {
+			log.Printf("[%s] line %d: unknown protocol: %q", tagPrefix, index+1, truncateForLog(line, 50))
+			continue
 		}
+		outbounds = append(outbounds, outbound)
 	}
 
 	if len(outbounds) == 0 {
@@ -156,6 +160,14 @@ func fallbackTag(prefix, protocol string, index int) string {
 		prefix = "subscription"
 	}
 	return fmt.Sprintf("%s-%s-%d", prefix, protocol, index+1)
+}
+
+func truncateForLog(s string, maxLen int) string {
+	r := []rune(s)
+	if len(r) <= maxLen {
+		return s
+	}
+	return string(r[:maxLen]) + "..."
 }
 
 func postProcessOutbounds(outbounds []Outbound, options BuildOptions) []Outbound {
