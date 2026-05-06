@@ -6,9 +6,14 @@ import (
 )
 
 type subscriptionResolver struct {
-	byTag  map[string]subscriptionSource
-	cache  map[string][]Outbound
-	loader SubscriptionContentLoader
+	byTag   map[string]SubscriptionSource
+	allTags []string
+	cache   map[string][]Outbound
+	loader  SubscriptionContentLoader
+}
+
+func (r *subscriptionResolver) knownTags() []string {
+	return r.allTags
 }
 
 func (r *subscriptionResolver) resolve(tag string) ([]Outbound, error) {

@@ -9,11 +9,11 @@ import (
 )
 
 type SubscriptionContentLoader interface {
-	Load(ctx context.Context, source subscriptionSource) ([]byte, error)
+	Load(ctx context.Context, source SubscriptionSource) ([]byte, error)
 }
 
 type URLLoader interface {
-	LoadURL(ctx context.Context, source subscriptionSource) ([]byte, error)
+	LoadURL(ctx context.Context, source SubscriptionSource) ([]byte, error)
 }
 
 func DefaultLoader() SubscriptionContentLoader {
@@ -28,7 +28,7 @@ type URLLoaderAdapter struct {
 	Loader URLLoader
 }
 
-func (l URLLoaderAdapter) Load(ctx context.Context, source subscriptionSource) ([]byte, error) {
+func (l URLLoaderAdapter) Load(ctx context.Context, source SubscriptionSource) ([]byte, error) {
 	if l.Loader == nil {
 		return nil, fmt.Errorf("url loader is not configured")
 	}
@@ -39,7 +39,7 @@ type HTTPURLLoader struct {
 	Client *http.Client
 }
 
-func (l HTTPURLLoader) LoadURL(ctx context.Context, source subscriptionSource) ([]byte, error) {
+func (l HTTPURLLoader) LoadURL(ctx context.Context, source SubscriptionSource) ([]byte, error) {
 	if source.URL == "" {
 		return nil, fmt.Errorf("url is empty")
 	}

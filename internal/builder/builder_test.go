@@ -315,12 +315,80 @@ type stubLoader struct {
 	payloads map[string]string
 }
 
-func (l stubLoader) Load(_ context.Context, source subscriptionSource) ([]byte, error) {
+func (l stubLoader) Load(_ context.Context, source SubscriptionSource) ([]byte, error) {
 	payload, ok := l.payloads[source.Tag]
 	if !ok {
 		return nil, fmt.Errorf("unexpected subscription tag %q", source.Tag)
 	}
 	return []byte(payload), nil
+}
+
+func TestBuildWildcardExpandsExternalSubscriptions(t *testing.T) {
+	template := []byte(`{
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "type": "selector",
+      "subscriptions": ["*"]
+    }
+  ]
+}`)
+
+	result, err := BuildWithOptions(template, t.TempDir(), stubLoader{
+		payloads: map[string]string{
+			"sub-a": "trojan://secret@a.example.com:443#node-a",
+			"sub-b": "trojan://secret@b.example.com:443#node-b",
+			"sub-c": "trojan://secret@c.example.com:443#node-c",
+		},
+	}, BuildOptions{
+		Subscriptions: []SubscriptionSource{
+			{Tag: "sub-a", URL: "https://example.com/a"},
+			{Tag: "sub-b", URL: "https://example.com/b"},
+			{Tag: "sub-c", URL: "https://example.com/c"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("build config: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(result, &decoded); err != nil {
+		t.Fatalf("decode result: %v", err)
+	}
+
+	outbounds := decoded["outbounds"].([]any)
+	proxy := outbounds[0].(map[string]any)
+	got := proxy["outbounds"].([]any)
+	if len(got) != 3 {
+		t.Fatalf("expected 3 outbound tags in selector, got %d: %#v", len(got), got)
+	}
+	if got[0] != "node-a" || got[1] != "node-b" || got[2] != "node-c" {
+		t.Fatalf("selector outbounds mismatch: %#v", got)
+	}
+}
+
+func TestBuildRejectsDuplicateTagAcrossTemplateAndClient(t *testing.T) {
+	template := []byte(`{
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "type": "selector",
+      "subscriptions": ["main"]
+    }
+  ],
+  "subscriptions": [
+    {"tag": "main", "url": "https://template.example.com/sub"}
+  ]
+}`)
+
+	_, err := BuildWithOptions(template, t.TempDir(), stubLoader{}, BuildOptions{
+		Subscriptions: []SubscriptionSource{
+			{Tag: "main", URL: "https://client.example.com/sub"},
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected error for duplicate subscription tag")
+	}
 }
 
 func TestParseSubscriptionContentParsesSupportedProtocols(t *testing.T) {

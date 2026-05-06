@@ -99,7 +99,23 @@ func expandSubscriptions(node any, resolver *subscriptionResolver) error {
 			return err
 		}
 
-		for _, subscriptionTag := range subscriptionTags {
+		expandedTags := make([]string, 0, len(subscriptionTags))
+		seen := make(map[string]bool, len(subscriptionTags))
+		for _, tag := range subscriptionTags {
+			if tag == "*" {
+				for _, kt := range resolver.knownTags() {
+					if !seen[kt] {
+						expandedTags = append(expandedTags, kt)
+						seen[kt] = true
+					}
+				}
+			} else if !seen[tag] {
+				expandedTags = append(expandedTags, tag)
+				seen[tag] = true
+			}
+		}
+
+		for _, subscriptionTag := range expandedTags {
 			items, err := resolver.resolve(subscriptionTag)
 			if err != nil {
 				return err

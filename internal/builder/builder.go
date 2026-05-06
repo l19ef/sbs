@@ -31,9 +31,17 @@ func BuildWithOptions(templateData []byte, baseDir string, loader SubscriptionCo
 		return nil, fmt.Errorf("parse template json: %w", err)
 	}
 
-	subscriptionByTag, err := extractRootSubscriptions(raw)
+	subscriptionByTag, tagOrder, err := extractRootSubscriptions(raw)
 	if err != nil {
 		return nil, err
+	}
+
+	for _, sub := range options.Subscriptions {
+		if _, exists := subscriptionByTag[sub.Tag]; exists {
+			return nil, fmt.Errorf("subscription tag %q is defined in both template and client config", sub.Tag)
+		}
+		subscriptionByTag[sub.Tag] = sub
+		tagOrder = append(tagOrder, sub.Tag)
 	}
 
 	rootOutbounds, err := ensureObjectArray(raw, "outbounds")
@@ -46,9 +54,10 @@ func BuildWithOptions(templateData []byte, baseDir string, loader SubscriptionCo
 	}
 
 	resolver := &subscriptionResolver{
-		byTag:  subscriptionByTag,
-		cache:  map[string][]Outbound{},
-		loader: loader,
+		byTag:   subscriptionByTag,
+		allTags: tagOrder,
+		cache:   map[string][]Outbound{},
+		loader:  loader,
 	}
 
 	if err := expandSubscriptions(raw, resolver); err != nil {
@@ -94,36 +103,38 @@ func BuildWithOptions(templateData []byte, baseDir string, loader SubscriptionCo
 	return append(result, '\n'), nil
 }
 
-func extractRootSubscriptions(root map[string]any) (map[string]subscriptionSource, error) {
+func extractRootSubscriptions(root map[string]any) (map[string]SubscriptionSource, []string, error) {
 	rawSubscriptions, exists := root["subscriptions"]
 	if !exists {
-		return map[string]subscriptionSource{}, nil
+		return map[string]SubscriptionSource{}, nil, nil
 	}
 	delete(root, "subscriptions")
 
 	data, err := json.Marshal(rawSubscriptions)
 	if err != nil {
-		return nil, fmt.Errorf("marshal subscriptions: %w", err)
+		return nil, nil, fmt.Errorf("marshal subscriptions: %w", err)
 	}
 
-	var items []subscriptionSource
+	var items []SubscriptionSource
 	if err := json.Unmarshal(data, &items); err != nil {
-		return nil, fmt.Errorf("unmarshal subscriptions: %w", err)
+		return nil, nil, fmt.Errorf("unmarshal subscriptions: %w", err)
 	}
 
-	subscriptionByTag := make(map[string]subscriptionSource, len(items))
+	subscriptionByTag := make(map[string]SubscriptionSource, len(items))
+	tagOrder := make([]string, 0, len(items))
 	for _, item := range items {
 		if item.Tag == "" {
-			return nil, fmt.Errorf("subscription tag cannot be empty")
+			return nil, nil, fmt.Errorf("subscription tag cannot be empty")
 		}
 		if item.URL == "" {
-			return nil, fmt.Errorf("subscription %q must define url", item.Tag)
+			return nil, nil, fmt.Errorf("subscription %q must define url", item.Tag)
 		}
 		if _, exists := subscriptionByTag[item.Tag]; exists {
-			return nil, fmt.Errorf("duplicate subscription tag %q", item.Tag)
+			return nil, nil, fmt.Errorf("duplicate subscription tag %q", item.Tag)
 		}
 		subscriptionByTag[item.Tag] = item
+		tagOrder = append(tagOrder, item.Tag)
 	}
 
-	return subscriptionByTag, nil
+	return subscriptionByTag, tagOrder, nil
 }

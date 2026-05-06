@@ -1,6 +1,6 @@
 package builder
 
-type subscriptionSource struct {
+type SubscriptionSource struct {
 	Tag              string   `json:"tag"`
 	URL              string   `json:"url"`
 	Emojify          bool     `json:"emojify"`
@@ -20,4 +20,5 @@ type BuildOptions struct {
 	ExcludeProtocols []string
 	Encoding         string
 	Format           string
+	Subscriptions    []SubscriptionSource
 }

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"sb-config-manager/internal/builder"
 )
 
 func TestValidateHostConfig(t *testing.T) {
@@ -15,7 +17,7 @@ func TestValidateHostConfig(t *testing.T) {
 		TLSKey:  "key.pem",
 		Port:    443,
 		Templates: []TemplateConfig{
-			{Path: "template.json", Token: "token-a"},
+			{Tag: "client-a", Path: "template.json", Token: "token-a"},
 		},
 	}
 
@@ -30,12 +32,49 @@ func TestValidateHostConfig(t *testing.T) {
 		{name: "negative port", mutate: func(cfg *HostConfig) { cfg.Port = -1 }, wantErr: true},
 		{name: "port too high", mutate: func(cfg *HostConfig) { cfg.Port = 70000 }, wantErr: true},
 		{name: "no templates", mutate: func(cfg *HostConfig) { cfg.Templates = nil }, wantErr: true},
+		{name: "empty template tag", mutate: func(cfg *HostConfig) { cfg.Templates[0].Tag = "" }, wantErr: true},
 		{name: "empty template path", mutate: func(cfg *HostConfig) { cfg.Templates[0].Path = "" }, wantErr: true},
 		{name: "empty template token", mutate: func(cfg *HostConfig) { cfg.Templates[0].Token = "" }, wantErr: true},
 		{
 			name: "duplicate template token",
 			mutate: func(cfg *HostConfig) {
-				cfg.Templates = append(cfg.Templates, TemplateConfig{Path: "template-2.json", Token: "token-a"})
+				cfg.Templates = append(cfg.Templates, TemplateConfig{Tag: "client-b", Path: "template-2.json", Token: "token-a"})
+			},
+			wantErr: true,
+		},
+		{
+			name: "duplicate subscription tag",
+			mutate: func(cfg *HostConfig) {
+				cfg.Subscriptions = []builder.SubscriptionSource{
+					{Tag: "sub-a", URL: "https://example.com/a"},
+					{Tag: "sub-a", URL: "https://example.com/b"},
+				}
+			},
+			wantErr: true,
+		},
+		{
+			name: "subscription missing url",
+			mutate: func(cfg *HostConfig) {
+				cfg.Subscriptions = []builder.SubscriptionSource{
+					{Tag: "sub-a"},
+				}
+			},
+			wantErr: true,
+		},
+		{
+			name: "valid config with subscriptions",
+			mutate: func(cfg *HostConfig) {
+				cfg.Subscriptions = []builder.SubscriptionSource{
+					{Tag: "sub-a", URL: "https://example.com/a"},
+				}
+				cfg.Templates[0].Subscriptions = []string{"sub-a"}
+			},
+			wantErr: false,
+		},
+		{
+			name: "subscription tag referenced but not defined",
+			mutate: func(cfg *HostConfig) {
+				cfg.Templates[0].Subscriptions = []string{"undefined-tag"}
 			},
 			wantErr: true,
 		},
@@ -126,7 +165,7 @@ func TestValidateHostConfigTrimsWhitespaceValues(t *testing.T) {
 		TLSCert: "  cert.pem  ",
 		TLSKey:  "\tkey.pem\n",
 		Templates: []TemplateConfig{
-			{Path: "  template.json  ", Token: " token-a "},
+			{Tag: " client-a ", Path: "  template.json  ", Token: " token-a "},
 		},
 	}
 
@@ -136,7 +175,7 @@ func TestValidateHostConfigTrimsWhitespaceValues(t *testing.T) {
 	if cfg.TLSCert != "cert.pem" || cfg.TLSKey != "key.pem" {
 		t.Fatalf("tls fields were not normalized: %#v", cfg)
 	}
-	if cfg.Templates[0].Path != "template.json" || cfg.Templates[0].Token != "token-a" {
+	if cfg.Templates[0].Tag != "client-a" || cfg.Templates[0].Path != "template.json" || cfg.Templates[0].Token != "token-a" {
 		t.Fatalf("template fields were not normalized: %#v", cfg.Templates[0])
 	}
 }
