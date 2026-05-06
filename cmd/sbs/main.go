@@ -223,9 +223,15 @@ func runServer(cfg *HostConfig, hostname string) error {
 	}
 	urlHost := host + suffix
 	fmt.Printf("Config server running on https://%s\n", urlHost)
+	maxTagLen := 0
+	for _, tmpl := range cfg.Templates {
+		if len(tmpl.Tag) > maxTagLen {
+			maxTagLen = len(tmpl.Tag)
+		}
+	}
 	fmt.Println("URLs:")
 	for _, tmpl := range cfg.Templates {
-		fmt.Printf("  %s: https://%s/config?token=%s\n", tmpl.Tag, urlHost, tmpl.Token)
+		fmt.Printf("  %-*s https://%s/config?token=%s\n", maxTagLen+1, tmpl.Tag+":", urlHost, tmpl.Token)
 	}
 
 	server := &http.Server{Handler: mux}
