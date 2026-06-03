@@ -16,6 +16,7 @@ type clashProxy struct {
 	Type       string                 `yaml:"type"`
 	Server     string                 `yaml:"server"`
 	Port       int                    `yaml:"port"`
+	Username   string                 `yaml:"username"`
 	Password   string                 `yaml:"password"`
 	Cipher     string                 `yaml:"cipher"`
 	UUID       string                 `yaml:"uuid"`
@@ -164,6 +165,18 @@ func parseClashProxy(proxy clashProxy, fallback string) (Outbound, bool, error) 
 		}
 		outbound.Transport = buildClashTransport(proxy)
 		return outbound, true, nil
+	case "socks5":
+		if proxy.Server == "" || proxy.Port == 0 {
+			return Outbound{}, true, fmt.Errorf("socks5 requires server and port")
+		}
+		return Outbound{
+			Tag:        tag,
+			Type:       "socks",
+			Server:     proxy.Server,
+			ServerPort: proxy.Port,
+			Username:   proxy.Username,
+			Password:   proxy.Password,
+		}, true, nil
 	case "hysteria2", "hy2":
 		if proxy.Server == "" || proxy.Port == 0 {
 			return Outbound{}, true, fmt.Errorf("hysteria2 requires server and port")

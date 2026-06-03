@@ -892,6 +892,121 @@ func TestXeovoSampleFixture(t *testing.T) {
 	}
 }
 
+func TestParseSocks5Line(t *testing.T) {
+	tests := []struct {
+		name       string
+		line       string
+		wantTag    string
+		wantServer string
+		wantPort   int
+		wantUser   string
+		wantPass   string
+		wantErr    bool
+	}{
+		{
+			name:       "with credentials and tag",
+			line:       "socks5://user:pass@proxy.example.com:1080#My%20Proxy",
+			wantTag:    "My Proxy",
+			wantServer: "proxy.example.com",
+			wantPort:   1080,
+			wantUser:   "user",
+			wantPass:   "pass",
+		},
+		{
+			name:       "without credentials",
+			line:       "socks5://proxy.example.com:1080",
+			wantTag:    "fallback",
+			wantServer: "proxy.example.com",
+			wantPort:   1080,
+		},
+		{
+			name:       "socks:// alias",
+			line:       "socks://proxy.example.com:1080#Alias",
+			wantTag:    "Alias",
+			wantServer: "proxy.example.com",
+			wantPort:   1080,
+		},
+		{
+			name:    "missing port",
+			line:    "socks5://proxy.example.com",
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			outbound, err := parseSocks5Line(tc.line, "fallback")
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseSocks5Line: %v", err)
+			}
+			if outbound.Type != "socks" {
+				t.Fatalf("unexpected type: %q", outbound.Type)
+			}
+			if outbound.Tag != tc.wantTag {
+				t.Fatalf("unexpected tag: got %q want %q", outbound.Tag, tc.wantTag)
+			}
+			if outbound.Server != tc.wantServer || outbound.ServerPort != tc.wantPort {
+				t.Fatalf("unexpected server: got %s:%d", outbound.Server, outbound.ServerPort)
+			}
+			if outbound.Username != tc.wantUser || outbound.Password != tc.wantPass {
+				t.Fatalf("unexpected credentials: got %q/%q", outbound.Username, outbound.Password)
+			}
+		})
+	}
+}
+
+func TestParseSubscriptionContentParsesSocks5(t *testing.T) {
+	outbounds, err := parseSubscriptionContent([]byte(stringsJoinLines(
+		"socks5://user:pass@proxy.example.com:1080#SOCKS5%20Node",
+		"trojan://secret@example.com:443#Trojan%20Node",
+	)), "remote", BuildOptions{})
+	if err != nil {
+		t.Fatalf("parse subscription content: %v", err)
+	}
+
+	if len(outbounds) != 2 {
+		t.Fatalf("unexpected outbound count: got %d want 2", len(outbounds))
+	}
+	if outbounds[0].Type != "socks" || outbounds[0].Tag != "SOCKS5 Node" {
+		t.Fatalf("unexpected socks5 outbound: %#v", outbounds[0])
+	}
+}
+
+func TestParseClashProxyParsesSocks5(t *testing.T) {
+	content := []byte(`proxies:
+- name: "SOCKS5 Proxy"
+  type: socks5
+  server: proxy.example.com
+  port: 1080
+  username: user
+  password: pass
+`)
+
+	outbounds, err := parseSubscriptionContent(content, "remote", BuildOptions{Format: "clash"})
+	if err != nil {
+		t.Fatalf("parse clash content: %v", err)
+	}
+	if len(outbounds) != 1 {
+		t.Fatalf("unexpected outbound count: got %d want 1", len(outbounds))
+	}
+	o := outbounds[0]
+	if o.Type != "socks" || o.Tag != "SOCKS5 Proxy" {
+		t.Fatalf("unexpected type/tag: %#v", o)
+	}
+	if o.Server != "proxy.example.com" || o.ServerPort != 1080 {
+		t.Fatalf("unexpected server: %s:%d", o.Server, o.ServerPort)
+	}
+	if o.Username != "user" || o.Password != "pass" {
+		t.Fatalf("unexpected credentials: %q/%q", o.Username, o.Password)
+	}
+}
+
 func stringsJoinLines(lines ...string) string {
 	return fmt.Sprintf("%s\n", strings.Join(lines, "\n"))
 }

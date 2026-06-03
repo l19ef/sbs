@@ -156,6 +156,12 @@ func parseSubscriptionLine(line, tagPrefix string, index int) (Outbound, bool, e
 			return Outbound{}, true, fmt.Errorf("naive: %w", err)
 		}
 		return outbound, true, nil
+	case strings.HasPrefix(line, "socks5://"), strings.HasPrefix(line, "socks://"):
+		outbound, err := parseSocks5Line(line, fallbackTag(tagPrefix, "socks5", index))
+		if err != nil {
+			return Outbound{}, true, fmt.Errorf("socks5: %w", err)
+		}
+		return outbound, true, nil
 	default:
 		return Outbound{}, false, nil
 	}
