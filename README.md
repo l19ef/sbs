@@ -149,6 +149,7 @@ With `"emojify": true`, country codes are converted to flag emojis:
 - **Hysteria2** — `hysteria2://...` or `hy2://...`
 - **Naive** — `http2://...`
 - **SOCKS5** — `socks5://...` or `socks://...`
+- **HTTP/HTTPS** — `http://...` or `https://...`
 
 ### Supported subscription formats
 

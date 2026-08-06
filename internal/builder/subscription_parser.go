@@ -162,6 +162,12 @@ func parseSubscriptionLine(line, tagPrefix string, index int) (Outbound, bool, e
 			return Outbound{}, true, fmt.Errorf("socks5: %w", err)
 		}
 		return outbound, true, nil
+	case strings.HasPrefix(line, "http://"), strings.HasPrefix(line, "https://"):
+		outbound, err := parseHTTPLine(line, fallbackTag(tagPrefix, "http", index))
+		if err != nil {
+			return Outbound{}, true, fmt.Errorf("http: %w", err)
+		}
+		return outbound, true, nil
 	default:
 		return Outbound{}, false, nil
 	}

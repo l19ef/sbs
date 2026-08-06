@@ -1007,6 +1007,141 @@ func TestParseClashProxyParsesSocks5(t *testing.T) {
 	}
 }
 
+func TestParseHTTPLine(t *testing.T) {
+	tests := []struct {
+		name       string
+		line       string
+		wantTag    string
+		wantServer string
+		wantPort   int
+		wantUser   string
+		wantPass   string
+		wantTLS    bool
+		wantErr    bool
+	}{
+		{
+			name:       "http with credentials and tag",
+			line:       "http://user:pass@proxy.example.com:8080#My%20Proxy",
+			wantTag:    "My Proxy",
+			wantServer: "proxy.example.com",
+			wantPort:   8080,
+			wantUser:   "user",
+			wantPass:   "pass",
+			wantTLS:    false,
+		},
+		{
+			name:       "https with credentials",
+			line:       "https://user:pass@proxy.example.com:8443#Secure",
+			wantTag:    "Secure",
+			wantServer: "proxy.example.com",
+			wantPort:   8443,
+			wantUser:   "user",
+			wantPass:   "pass",
+			wantTLS:    true,
+		},
+		{
+			name:       "http without credentials",
+			line:       "http://proxy.example.com:8080",
+			wantTag:    "fallback",
+			wantServer: "proxy.example.com",
+			wantPort:   8080,
+			wantTLS:    false,
+		},
+		{
+			name:    "missing port",
+			line:    "http://proxy.example.com",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			outbound, err := parseHTTPLine(tt.line, "fallback")
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got none")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if outbound.Type != "http" {
+				t.Fatalf("unexpected type: %q", outbound.Type)
+			}
+			if outbound.Tag != tt.wantTag {
+				t.Fatalf("unexpected tag: got %q want %q", outbound.Tag, tt.wantTag)
+			}
+			if outbound.Server != tt.wantServer || outbound.ServerPort != tt.wantPort {
+				t.Fatalf("unexpected server: %s:%d", outbound.Server, outbound.ServerPort)
+			}
+			if outbound.Username != tt.wantUser || outbound.Password != tt.wantPass {
+				t.Fatalf("unexpected credentials: %q/%q", outbound.Username, outbound.Password)
+			}
+			gotTLS := outbound.TLS != nil && outbound.TLS["enabled"] == true
+			if gotTLS != tt.wantTLS {
+				t.Fatalf("unexpected tls: got %v want %v", outbound.TLS, tt.wantTLS)
+			}
+		})
+	}
+}
+
+func TestParseSubscriptionContentParsesHTTP(t *testing.T) {
+	outbounds, err := parseSubscriptionContent([]byte(stringsJoinLines(
+		"http://user:pass@proxy.example.com:8080#HTTP%20Node",
+		"https://user:pass@proxy.example.com:8443#HTTPS%20Node",
+	)), "remote", BuildOptions{})
+	if err != nil {
+		t.Fatalf("parse subscription content: %v", err)
+	}
+
+	if len(outbounds) != 2 {
+		t.Fatalf("unexpected outbound count: got %d want 2", len(outbounds))
+	}
+	if outbounds[0].Type != "http" || outbounds[0].Tag != "HTTP Node" || outbounds[0].TLS != nil {
+		t.Fatalf("unexpected http outbound: %#v", outbounds[0])
+	}
+	if outbounds[1].Type != "http" || outbounds[1].Tag != "HTTPS Node" {
+		t.Fatalf("unexpected https outbound: %#v", outbounds[1])
+	}
+	if outbounds[1].TLS == nil || outbounds[1].TLS["enabled"] != true {
+		t.Fatalf("expected tls enabled for https outbound: %#v", outbounds[1].TLS)
+	}
+}
+
+func TestParseClashProxyParsesHTTP(t *testing.T) {
+	content := []byte(`proxies:
+- name: "HTTP Proxy"
+  type: http
+  server: proxy.example.com
+  port: 8080
+  username: user
+  password: pass
+  tls: true
+`)
+
+	outbounds, err := parseSubscriptionContent(content, "remote", BuildOptions{Format: "clash"})
+	if err != nil {
+		t.Fatalf("parse clash content: %v", err)
+	}
+	if len(outbounds) != 1 {
+		t.Fatalf("unexpected outbound count: got %d want 1", len(outbounds))
+	}
+	o := outbounds[0]
+	if o.Type != "http" || o.Tag != "HTTP Proxy" {
+		t.Fatalf("unexpected type/tag: %#v", o)
+	}
+	if o.Server != "proxy.example.com" || o.ServerPort != 8080 {
+		t.Fatalf("unexpected server: %s:%d", o.Server, o.ServerPort)
+	}
+	if o.Username != "user" || o.Password != "pass" {
+		t.Fatalf("unexpected credentials: %q/%q", o.Username, o.Password)
+	}
+	if o.TLS == nil || o.TLS["enabled"] != true {
+		t.Fatalf("expected tls enabled: %#v", o.TLS)
+	}
+}
+
 func stringsJoinLines(lines ...string) string {
 	return fmt.Sprintf("%s\n", strings.Join(lines, "\n"))
 }

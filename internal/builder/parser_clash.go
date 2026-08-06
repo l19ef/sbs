@@ -177,6 +177,28 @@ func parseClashProxy(proxy clashProxy, fallback string) (Outbound, bool, error) 
 			Username:   proxy.Username,
 			Password:   proxy.Password,
 		}, true, nil
+	case "http":
+		if proxy.Server == "" || proxy.Port == 0 {
+			return Outbound{}, true, fmt.Errorf("http requires server and port")
+		}
+		outbound := Outbound{
+			Tag:        tag,
+			Type:       "http",
+			Server:     proxy.Server,
+			ServerPort: proxy.Port,
+			Username:   proxy.Username,
+			Password:   proxy.Password,
+		}
+		if proxy.TLS || proxy.SNI != "" || proxy.ServerName != "" {
+			outbound.TLS = map[string]any{
+				"enabled":  true,
+				"insecure": false,
+			}
+			if serverName := firstNonEmpty(proxy.SNI, proxy.ServerName); serverName != "" {
+				outbound.TLS["server_name"] = serverName
+			}
+		}
+		return outbound, true, nil
 	case "hysteria2", "hy2":
 		if proxy.Server == "" || proxy.Port == 0 {
 			return Outbound{}, true, fmt.Errorf("hysteria2 requires server and port")
